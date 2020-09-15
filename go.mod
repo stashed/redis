@@ -11,7 +11,6 @@ require (
 	github.com/google/gofuzz v1.1.0
 	github.com/spf13/cobra v0.0.5
 	github.com/yudai/gojsondiff v1.0.0
-	k8s.io/api v0.18.3
 	k8s.io/apiextensions-apiserver v0.18.3
 	k8s.io/apimachinery v0.18.3
 	k8s.io/client-go v12.0.0+incompatible

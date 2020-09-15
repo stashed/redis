@@ -52,6 +52,8 @@ RESTIC_VER       := 0.8.3
 # also update in restic wrapper library
 NEW_RESTIC_VER   := 0.9.6
 
+REDIS_DUMP_VER   := 0.4.0
+
 ###
 ### These variables should not need tweaking.
 ###
@@ -66,8 +68,8 @@ BIN_PLATFORMS    := $(DOCKER_PLATFORMS)
 OS   := $(if $(GOOS),$(GOOS),$(shell go env GOOS))
 ARCH := $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
 
-BASEIMAGE_PROD   ?= redis:8.0.14
-BASEIMAGE_DBG    ?= redis:8.0.14
+BASEIMAGE_PROD   ?= redis:5.0.3
+BASEIMAGE_DBG    ?= redis:5.0.3
 
 IMAGE            := $(REGISTRY)/$(BIN)
 VERSION_PROD     := $(VERSION)
@@ -396,6 +398,7 @@ bin/.container-$(DOTFILE_IMAGE)-%: bin/$(OS)_$(ARCH)/$(BIN) $(DOCKERFILE_%)
 		-e 's|{ARG_FROM}|$(BASEIMAGE_$*)|g'         \
 		-e 's|{RESTIC_VER}|$(RESTIC_VER)|g'         \
 		-e 's|{NEW_RESTIC_VER}|$(NEW_RESTIC_VER)|g' \
+		-e 's|{REDIS_DUMP_VER}|$(REDIS_DUMP_VER)|g' \
 		$(DOCKERFILE_$*) > bin/.dockerfile-$*-$(OS)_$(ARCH)
 	@DOCKER_CLI_EXPERIMENTAL=enabled docker buildx build --platform $(OS)/$(ARCH) --load --pull -t $(IMAGE):$(TAG_$*) -f bin/.dockerfile-$*-$(OS)_$(ARCH) .
 	@docker images -q $(IMAGE):$(TAG_$*) > $@

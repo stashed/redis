@@ -44,16 +44,16 @@ The command removes all the Kubernetes components associated with the chart and 
 
 The following table lists the configurable parameters of the `stash-redis` chart and their default values.
 
-|    Parameter     |                                                         Description                                                         |       Default       |
-|------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------------|
-| nameOverride     | Overrides name template                                                                                                     | `""`                |
-| fullnameOverride | Overrides fullname template                                                                                                 | `""`                |
-| image.registry   | Docker registry used to pull Redis addon image                                                                              | `stashed`           |
-| image.repository | Docker image used to backup/restore Redis database                                                                          | `stash-redis`       |
-| image.tag        | Tag of the image that is used to backup/restore Redis database. This is usually same as the database version it can backup. | `v2020.08.27`       |
-| backup.args      | Arguments to pass to `redisdump` command  during bakcup process                                                             | `"--all-databases"` |
-| restore.args     | Arguments to pass to `redis` command during restore process                                                                 | `""`                |
-| waitTimeout      | Number of seconds to wait for the database to be ready before backup/restore process.                                       | `300`               |
+|    Parameter     |                                                         Description                                                         |    Default    |
+|------------------|-----------------------------------------------------------------------------------------------------------------------------|---------------|
+| nameOverride     | Overrides name template                                                                                                     | `""`          |
+| fullnameOverride | Overrides fullname template                                                                                                 | `""`          |
+| image.registry   | Docker registry used to pull Redis addon image                                                                              | `stashed`     |
+| image.repository | Docker image used to backup/restore Redis database                                                                          | `stash-redis` |
+| image.tag        | Tag of the image that is used to backup/restore Redis database. This is usually same as the database version it can backup. | `5.0.3`       |
+| backup.args      | Arguments to pass to `redis-dump-go` command  during bakcup process                                                         | `""`          |
+| restore.args     | Arguments to pass to `redis` command during restore process                                                                 | `""`          |
+| waitTimeout      | Number of seconds to wait for the database to be ready before backup/restore process.                                       | `300`         |
 
 
 Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`. For example:

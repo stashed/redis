@@ -17,14 +17,14 @@ limitations under the License.
 package pkg
 
 import (
-	"fmt"
+	"time"
 
 	stash "stash.appscode.dev/apimachinery/client/clientset/versioned"
 	"stash.appscode.dev/apimachinery/pkg/restic"
 
 	"github.com/appscode/go/log"
+	"github.com/appscode/go/wait"
 	"github.com/codeskyblue/go-sh"
-	core "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
@@ -33,9 +33,9 @@ import (
 const (
 	RedisUser        = "username"
 	RedisPassword    = "password"
-	RedisDumpFile    = "dumpfile.sql"
-	RedisDumpCMD     = "redisdump"
-	RedisRestoreCMD  = "redis"
+	RedisDumpFile    = "dumpfile.resp"
+	RedisDumpCMD     = "redis-dump-go"
+	RedisRestoreCMD  = "redis-cli"
 	EnvRedisPassword = "REDIS_PWD"
 )
 
@@ -56,15 +56,19 @@ type redisOptions struct {
 	dumpOptions   restic.DumpOptions
 }
 
-func waitForDBReady(appBinding *v1alpha1.AppBinding, secret *core.Secret, waitTimeout int32) error {
+func waitForDBReady(appBinding *v1alpha1.AppBinding) error {
 	log.Infoln("Waiting for the database to be ready.....")
 	shell := sh.NewSession()
-	shell.SetEnv(EnvRedisPassword, string(secret.Data[RedisPassword]))
+	//shell.SetEnv(EnvRedisPassword, string(secret.Data[RedisPassword]))
 	args := []interface{}{
+		"-h", appBinding.Spec.ClientConfig.Service.Name,
 		"ping",
-		"--host", appBinding.Spec.ClientConfig.Service.Name,
-		"--user=root",
-		fmt.Sprintf("--wait=%d", waitTimeout),
 	}
-	return shell.Command("redisadmin", args...).Run()
+	return wait.PollImmediate(time.Second*5, time.Minute*5, func() (bool, error) {
+		err := shell.Command("redis-cli", args...).Run()
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
 }
