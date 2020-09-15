@@ -149,16 +149,16 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 	// get secret
-	appBindingSecret, err := opt.kubeClient.CoreV1().Secrets(opt.namespace).Get(context.TODO(), appBinding.Spec.Secret.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
+	//appBindingSecret, err := opt.kubeClient.CoreV1().Secrets(opt.namespace).Get(context.TODO(), appBinding.Spec.Secret.Name, metav1.GetOptions{})
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	// transform secret
-	err = appBinding.TransformSecret(opt.kubeClient, appBindingSecret.Data)
-	if err != nil {
-		return nil, err
-	}
+	//err = appBinding.TransformSecret(opt.kubeClient, appBindingSecret.Data)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	// init restic wrapper
 	resticWrapper, err := restic.NewResticWrapper(opt.setupOptions)
@@ -167,12 +167,13 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 	}
 
 	// set env for redis
-	resticWrapper.SetEnv(EnvRedisPassword, string(appBindingSecret.Data[RedisPassword]))
+	//resticWrapper.SetEnv(EnvRedisPassword, string(appBindingSecret.Data[RedisPassword]))
 	// setup pipe command
 	opt.dumpOptions.StdoutPipeCommand = restic.Command{
 		Name: RedisRestoreCMD,
 		Args: []interface{}{
-			"-u", string(appBindingSecret.Data[RedisUser]),
+			"--pipe",
+			//"-u", string(appBindingSecret.Data[RedisUser]),
 			"-h", appBinding.Spec.ClientConfig.Service.Name,
 		},
 	}
@@ -181,7 +182,7 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 	}
 
 	// wait for DB ready
-	err = waitForDBReady(appBinding, appBindingSecret, opt.waitTimeout)
+	err = waitForDBReady(appBinding)
 	if err != nil {
 		return nil, err
 	}

@@ -19,7 +19,7 @@ ENV DEBCONF_NONINTERACTIVE_SEEN true
 
 RUN set -x \
   && apt-get update \
-  && apt-get install -y --no-install-recommends apt-transport-https ca-certificates curl bzip2
+  && apt-get install -y --no-install-recommends apt-transport-https ca-certificates curl bzip2 tar
 
 RUN set -x                                                                                                                                                          \
   && curl -fsSL -o restic.bz2 https://github.com/restic/restic/releases/download/v{RESTIC_VER}/restic_{RESTIC_VER}_{ARG_OS}_{ARG_ARCH}.bz2                          \
@@ -29,7 +29,10 @@ RUN set -x                                                                      
   && bzip2 -d restic_{NEW_RESTIC_VER}.bz2                                                                                                                           \
   && chmod 755 restic_{NEW_RESTIC_VER}
 
-
+RUN set -x                                                                                                                                                          \
+  && curl -fsSL -o redis-dump-go.tar.gz https://github.com/yannh/redis-dump-go/releases/download/v{REDIS_DUMP_VER}/redis-dump-go-{ARG_OS}-{ARG_ARCH}.tar.gz         \
+  && tar -xzf redis-dump-go.tar.gz                                                                                                                                  \
+  && chmod 755 redis-dump-go
 
 FROM {ARG_FROM}
 
@@ -42,6 +45,7 @@ RUN set -x \
   && rm -rf /var/lib/apt/lists/* /usr/share/doc /usr/share/man /tmp/*
 
 COPY --from=0 restic_{NEW_RESTIC_VER} /bin/restic_{NEW_RESTIC_VER}
+COPY --from=0 redis-dump-go /bin/redis-dump-go
 COPY bin/{ARG_OS}_{ARG_ARCH}/{ARG_BIN} /{ARG_BIN}
 
 ENTRYPOINT ["/{ARG_BIN}"]

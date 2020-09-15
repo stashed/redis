@@ -17,7 +17,7 @@ image:
 # optional argument to send redisdump or redis command
 backup:
   # Arguments to pass to `redisdump` command  during bakcup process
-  args: "--all-databases"
+  args: ""
 restore:
   # Arguments to pass to `redis` command during restore process
   args: ""
