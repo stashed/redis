@@ -8,7 +8,7 @@ spec:
   task:
     name: redis-backup-5.0.3
   repository:
-    name: gcs-repo
+    name: redis-standalone-repo
   target:
     ref:
       apiVersion: appcatalog.appscode.com/v1alpha1
