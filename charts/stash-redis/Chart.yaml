@@ -1,7 +1,7 @@
 apiVersion: v1
 description: 'stash-redis - Redis database plugin for Stash by AppsCode'
 name: stash-redis
-version: v2020.08.27
+version: 5.0.3
 appVersion: v2020.08.27
 home: https://stash.run
 icon: https://cdn.appscode.com/images/products/stash/addons/redis-stash-addon.png

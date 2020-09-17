@@ -1,11 +1,11 @@
 apiVersion: stash.appscode.com/v1alpha1
 kind: Repository
 metadata:
-  name: gcs-repo
+  name: redis-standalone-repo
   namespace: demo
 spec:
   backend:
     gcs:
-      bucket: appscode-qa
-      prefix: /demo/redis/sample-redis
+      bucket: stash-ci
+      prefix: /redisdump
     storageSecretName: gcs-secret

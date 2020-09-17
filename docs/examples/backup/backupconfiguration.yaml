@@ -6,9 +6,9 @@ metadata:
 spec:
   schedule: "*/5 * * * *"
   task:
-    name: redis-backup-8.0.14
+    name: redis-backup-5.0.3
   repository:
-    name: gcs-repo
+    name: redis-standalone-repo
   target:
     ref:
       apiVersion: appcatalog.appscode.com/v1alpha1
