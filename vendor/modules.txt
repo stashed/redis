@@ -31,6 +31,7 @@ github.com/appscode/go/runtime
 github.com/appscode/go/sets
 github.com/appscode/go/types
 github.com/appscode/go/version
+github.com/appscode/go/wait
 # github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 github.com/armon/circbuf
 # github.com/beorn7/perks v1.0.1

@@ -16,4 +16,4 @@ spec:
       kind: AppBinding
       name: restored-redis
   rules:
-    - snapshots: [latest]
+  - snapshots: [latest]
