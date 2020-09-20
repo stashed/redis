@@ -1,0 +1,25 @@
+# Default values for stash-redis.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Overrides name template
+nameOverride: ""
+# Overrides fullname template
+fullnameOverride: ""
+image:
+  # Docker registry used to pull Redis addon image
+  registry: stashed
+  # Docker image used to backup/restore Redis database
+  repository: stash-redis
+  # Tag of the image that is used to backup/restore Redis database.
+  # This is usually same as the database version it can backup.
+  tag: v2020.09.16
+# optional argument to send redisdump or redis command
+backup:
+  # Arguments to pass to `redisdump` command  during bakcup process
+  args: "--all-databases"
+restore:
+  # Arguments to pass to `redis` command during restore process
+  args: ""
+# Number of seconds to wait for the database to be ready before backup/restore process.
+waitTimeout: 300
