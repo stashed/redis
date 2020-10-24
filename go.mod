@@ -5,7 +5,6 @@ go 1.12
 require (
 	github.com/appscode/go v0.0.0-20200928211031-cc0c23082d91
 	github.com/codeskyblue/go-sh v0.0.0-20190412065543-76bd3d59ff27
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-openapi/spec v0.19.8
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
