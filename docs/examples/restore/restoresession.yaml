@@ -1,7 +1,7 @@
 apiVersion: stash.appscode.com/v1beta1
 kind: RestoreSession
 metadata:
-  name: restore-sample-redis
+  name: sample-redis-restore
   namespace: demo
   labels:
     kubedb.com/kind: Redis # this label is mandatory if you are using KubeDB to deploy the database.
@@ -9,11 +9,11 @@ spec:
   task:
     name: redis-restore-5.0.3
   repository:
-    name: gcs-repo
+    name: redis-standalone-repo
   target:
     ref:
       apiVersion: appcatalog.appscode.com/v1alpha1
       kind: AppBinding
-      name: restored-redis
+      name: redis-recovery-test
   rules:
-    - snapshots: [latest]
+  - snapshots: [latest]
