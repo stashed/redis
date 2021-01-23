@@ -10,7 +10,7 @@ require (
 	github.com/google/gofuzz v1.1.0
 	github.com/spf13/cobra v1.1.1
 	github.com/yudai/gojsondiff v1.0.0
-	go.bytebuilders.dev/license-verifier/kubernetes v0.5.1
+	go.bytebuilders.dev/license-verifier/kubernetes v0.6.1
 	gomodules.xyz/runtime v0.0.0-20201104200926-d838b09dda8b
 	gomodules.xyz/x v0.0.0-20201105065653-91c568df6331
 	k8s.io/api v0.18.9
@@ -18,7 +18,7 @@ require (
 	k8s.io/apimachinery v0.18.9
 	k8s.io/client-go v0.18.9
 	k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6
-	kmodules.xyz/client-go v0.0.0-20210108092221-c3812eb92bd0
+	kmodules.xyz/client-go v0.0.0-20210118094617-273ba20ad7ca
 	kmodules.xyz/crd-schema-fuzz v0.0.0-20200922204806-c1426cd7fcf4
 	kmodules.xyz/custom-resources v0.0.0-20201124062543-bd8d35c21b0c
 	kmodules.xyz/offshoot-api v0.0.0-20201105074700-8675f5f686f2
