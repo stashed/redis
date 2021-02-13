@@ -39,7 +39,6 @@ $ helm delete stash-redis-v2020.09.16 -n kube-system
 ```
 
 The command removes all the Kubernetes components associated with the chart and deletes the release.
-
 ## Configuration
 
 The following table lists the configurable parameters of the `stash-redis` chart and their default values.
