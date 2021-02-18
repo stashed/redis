@@ -4,7 +4,7 @@ description: Backup Redis database using Stash
 menu:
   docs_{{ .version }}:
     identifier: redis-guide-{{ .subproject_version }}
-    name: Backup & Restore Redis
+    name: Standalone Redis
     parent: stash-redis-guides-{{ .subproject_version }}
     weight: 10
 product_name: stash
@@ -43,7 +43,7 @@ namespace/demo created
 
 ## Backup Redis
 
-This section will demonstrate how to backup Redis database. Here, we are going to deploy a Redis database using KubeDB. Then, we are going to backup this database into a GCS bucket. Finally, we are going to restore the backed up data into another Redis database.
+This section will demonstrate how to backup Redis database. Here, we are going to deploy a Redis database using KubeDB. Then, we are going to backup this database into a GCS bucket. Finally, we are going to restore the backed up data into another Redis database. For taking backup stash has mainly two models. One is side car model & the other one is job model. Here in this doc, we are going to demonstrate the process that uses the job model.
 
 ### Deploy Sample Redis Database
 
@@ -54,21 +54,21 @@ Let's deploy a sample Redis database and insert some data into it.
 Below is the YAML of a sample Redis CRD that we are going to create for this tutorial:
 
 ```yaml
-apiVersion: kubedb.com/v1alpha1
+apiVersion: kubedb.com/v1alpha2
 kind: Redis
 metadata:
   name: sample-redis
   namespace: demo
 spec:
-  version: "5.0.3"
-  replicas: 1
+  version: 5.0.3-v1
   storageType: Durable
   storage:
+    storageClassName: "standard"
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     resources:
       requests:
-        storage: 50Mi
+        storage: 1Gi
   terminationPolicy: WipeOut
 ```
 
@@ -79,39 +79,35 @@ $ kubectl apply -f https://github.com/stashed/redis/raw/{{< param "info.subproje
 redis.kubedb.com/sample-redis created
 ```
 
-KubeDB will deploy a Redis database according to the above specification. It will also create the necessary Secrets and Services to access the database.
+KubeDB will deploy a Redis database according to the above specification. It will also create the necessary Services to access the database.
 
 Let's check if the database is ready to use,
 
 ```bash
-$ kubectl get my -n demo sample-redis
-NAME           VERSION   STATUS    AGE
-sample-redis   5.0.3    Running   4m22s
+$ kubectl get redis -n demo sample-redis
+NAME           VERSION    STATUS    AGE
+sample-redis   5.0.3-v1   Running   70s
 ```
 
-The database is `Running`. Verify that KubeDB has created a Secret and a Service for this database using the following commands,
+The database is `Running`. Verify that KubeDB has created a Service for this database using the following commands,
 
 ```bash
-$ kubectl get secret -n demo -l=kubedb.com/name=sample-redis
-NAME                TYPE     DATA   AGE
-sample-redis-auth   Opaque   2      4m58s
 
 $ kubectl get service -n demo -l=kubedb.com/name=sample-redis
-NAME               TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
-sample-redis       ClusterIP   10.101.2.138   <none>        3306/TCP   5m33s
-sample-redis-gvr   ClusterIP   None           <none>        3306/TCP   5m33s
+NAME           TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+sample-redis   ClusterIP   10.96.74.231   <none>        6379/TCP   2m9s
 ```
 
-Here, we have to use service `sample-redis` and secret `sample-redis-auth` to connect with the database. KubeDB creates an [AppBinding](/docs/concepts/crds/appbinding.md) CRD that holds the necessary information to connect with the database.
+Here, we have to use service `sample-redis` to connect with the database. KubeDB creates an [AppBinding](/docs/concepts/crds/appbinding.md) CRD that holds the necessary information to connect with the database.
 
 **Verify AppBinding:**
 
 Verify that the AppBinding has been created successfully using the following command,
 
 ```bash
-$ kubectl get appbindings -n demo
-NAME           AGE
-sample-redis   9m24s
+$ kubectl get appbinding -n demo
+NAME           TYPE               VERSION   AGE
+sample-redis   kubedb.com/redis   5.0.3     4m2s
 ```
 
 Let's check the YAML of the above AppBinding,
@@ -124,28 +120,37 @@ $ kubectl get appbindings -n demo sample-redis -o yaml
 apiVersion: appcatalog.appscode.com/v1alpha1
 kind: AppBinding
 metadata:
-  creationTimestamp: "2019-09-27T05:07:34Z"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"kubedb.com/v1alpha1","kind":"Redis","metadata":{"annotations":{},"name":"sample-redis","namespace":"demo"},"spec":{"storage":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"1Gi"}},"storageClassName":"standard"},"storageType":"Durable","version":"5.0.3-v1"}}
+  creationTimestamp: "2020-09-16T06:17:06Z"
   generation: 1
   labels:
     app.kubernetes.io/component: database
     app.kubernetes.io/instance: sample-redis
     app.kubernetes.io/managed-by: kubedb.com
     app.kubernetes.io/name: redis
-    app.kubernetes.io/version: 5.0.3
+    app.kubernetes.io/version: 5.0.3-v1
     kubedb.com/kind: Redis
     kubedb.com/name: sample-redis
   name: sample-redis
   namespace: demo
+  ownerReferences:
+  - apiVersion: kubedb.com/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Redis
+    name: sample-redis
+    uid: aa1901e5-9695-4548-9a03-a899083bfb1a
+  resourceVersion: "2860"
+  selfLink: /apis/appcatalog.appscode.com/v1alpha1/namespaces/demo/appbindings/sample-redis
+  uid: 8b49f9e2-058c-47f8-9e4f-b386a47f33d9
 spec:
   clientConfig:
     service:
       name: sample-redis
-      path: /
-      port: 3306
+      port: 6379
       scheme: redis
-    url: tcp(sample-redis:3306)/
-  secret:
-    name: sample-redis-auth
   type: kubedb.com/redis
   version: 5.0.3
 ```
@@ -153,12 +158,11 @@ spec:
 Stash uses the AppBinding CRD to connect with the target database. It requires the following two fields to set in AppBinding's `.spec` section.
 
 - `.spec.clientConfig.service.name` specifies the name of the Service that connects to the database.
-- `.spec.secret` specifies the name of the Secret that holds necessary credentials to access the database.
 - `spec.type` specifies the types of the app that this AppBinding is pointing to. KubeDB generated AppBinding follows the following format: `<app group>/<app resource type>`.
 
 **Creating AppBinding Manually:**
 
-If you deploy Redis database without KubeDB, you have to create the AppBinding CRD manually in the same namespace as the service and secret of the database.
+If you deploy Redis database without KubeDB, you have to create the AppBinding CRD manually in the same namespace as the service of the database.
 
 The following YAML shows a minimal AppBinding specification that you have to create if you deploy Redis database without KubeDB.
 
@@ -174,8 +178,6 @@ spec:
       name: <my_database_service_name>
       port: <my_database_port_number>
       scheme: redis
-  secret:
-    name: <my_database_credentials_secret_name>
   # type field is optional. you can keep it empty.
   # if you keep it empty then the value of TARGET_APP_RESOURCE variable
   # will be set to "appbinding" during auto-backup.
@@ -194,72 +196,20 @@ NAME             READY   STATUS    RESTARTS   AGE
 sample-redis-0   1/1     Running   0          33m
 ```
 
-And copy the user name and password of the `root` user to access into `redis` shell.
+
+Now, let's exec into the Pod to enter into `redis` shell and store some data to backup and restore later:
 
 ```bash
-$ kubectl get secret -n demo  sample-redis-auth -o jsonpath='{.data.username}'| base64 -d
-root⏎
-
-$ kubectl get secret -n demo  sample-redis-auth -o jsonpath='{.data.password}'| base64 -d
-5HEqoozyjgaMO97N⏎
-```
-
-Now, let's exec into the Pod to enter into `redis` shell and create a database and a table,
-
-```bash
-$ kubectl exec -it -n demo sample-redis-0 -- redis --user=root --password=5HEqoozyjgaMO97N
-redis: [Warning] Using a password on the command line interface can be insecure.
-Welcome to the Redis monitor.  Commands end with ; or \g.
-Your Redis connection id is 10
-Server version: 5.0.3 Redis Community Server - GPL
-
-Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
-
-Oracle is a registered trademark of Oracle Corporation and/or its
-affiliates. Other names may be trademarks of their respective
-owners.
-
-Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
-
-redis> CREATE DATABASE playground;
-Query OK, 1 row affected (0.01 sec)
-
-redis> SHOW DATABASES;
-+--------------------+
-| Database           |
-+--------------------+
-| information_schema |
-| redis              |
-| performance_schema |
-| playground         |
-| sys                |
-+--------------------+
-5 rows in set (0.00 sec)
-
-redis> CREATE TABLE playground.equipment ( id INT NOT NULL AUTO_INCREMENT, type VARCHAR(50), quant INT, color VARCHAR(25), PRIMARY KEY(id));
-Query OK, 0 rows affected (0.01 sec)
-
-redis> SHOW TABLES IN playground;
-+----------------------+
-| Tables_in_playground |
-+----------------------+
-| equipment            |
-+----------------------+
-1 row in set (0.01 sec)
-
-redis> INSERT INTO playground.equipment (type, quant, color) VALUES ("slide", 2, "blue");
-Query OK, 1 row affected (0.01 sec)
-
-redis> SELECT * FROM playground.equipment;
-+----+-------+-------+-------+
-| id | type  | quant | color |
-+----+-------+-------+-------+
-|  1 | slide |     2 | blue  |
-+----+-------+-------+-------+
-1 row in set (0.00 sec)
-
-redis> exit
-Bye
+$ kubectl exec -it sample-redis-0 -n demo -- sh
+/data # redis-cli
+127.0.0.1:6379> set hello world
+OK
+127.0.0.1:6379> set stash backup
+OK
+127.0.0.1:6379> set AppsCode KubeDB
+OK
+127.0.0.1:6379> exit
+/data # exit
 ```
 
 Now, we are ready to backup the database.
@@ -291,13 +241,13 @@ Now, crete a `Repository` using this secret. Below is the YAML of Repository CRD
 apiVersion: stash.appscode.com/v1alpha1
 kind: Repository
 metadata:
-  name: gcs-repo
+  name: redis-standalone-repo
   namespace: demo
 spec:
   backend:
     gcs:
-      bucket: appscode-qa
-      prefix: /demo/redis/sample-redis
+      bucket: stash-ci
+      prefix: /redisdump
     storageSecretName: gcs-secret
 ```
 
@@ -329,7 +279,7 @@ spec:
   task:
     name: redis-backup-{{< param "info.subproject_version" >}}
   repository:
-    name: gcs-repo
+    name: redis-standalone-repo
   target:
     ref:
       apiVersion: appcatalog.appscode.com/v1alpha1
@@ -362,8 +312,8 @@ Verify that the CronJob has been created using the following command,
 
 ```bash
 $ kubectl get cronjob -n demo
-NAME                  SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
-sample-redis-backup   */5 * * * *   False     0        <none>          27s
+NAME                               SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+stash-backup-sample-redis-backup   */5 * * * *   False     0        <none>          43s
 ```
 
 **Wait for BackupSession:**
@@ -373,9 +323,9 @@ The `sample-redis-backup` CronJob will trigger a backup on each scheduled slot b
 Wait for a schedule to appear. Run the following command to watch `BackupSession` CRD,
 
 ```bash
-$ watch -n 1 kubectl get backupsession -n demo -l=stash.appscode.com/backup-configuration=sample-redis-backup
+$ watch -n 1 kubectl get backupsession -n demo -l=stash.appscode.com/invoker-name=sample-redis-backup
 
-Every 1.0s: kubectl get backupsession -n demo -l=stash.appscode.com/backup-configuration=sample-redis-backup   workstation: Fri Sep 27 11:14:43 2019
+Every 1.0s: kubectl get backupsession -n demo -l=stash.appscode.com/invoker-name=sample-redis-backup   workstation: Fri Sep 27 11:14:43 2019
 
 NAME                             INVOKER-TYPE          INVOKER-NAME          PHASE       AGE
 sample-redis-backup-1569561245   BackupConfiguration   sample-redis-backup   Succeeded   38s
@@ -383,19 +333,19 @@ sample-redis-backup-1569561245   BackupConfiguration   sample-redis-backup   Suc
 
 Here, the phase **`Succeeded`** means that the backupsession has been succeeded.
 
->Note: Backup CronJob creates `BackupSession` crds with the following label `stash.appscode.com/backup-configuration=<BackupConfiguration crd name>`. We can use this label to watch only the `BackupSession` of our desired `BackupConfiguration`.
+>Note: Backup CronJob creates `BackupSession` crds with the following label `stash.appscode.com/invoker-name=<BackupConfiguration crd name>`. We can use this label to watch only the `BackupSession` of our desired `BackupConfiguration`.
 
 **Verify Backup:**
 
-Now, we are going to verify whether the backed up data is in the backend. Once a backup is completed, Stash will update the respective `Repository` CRD to reflect the backup completion. Check that the repository `gcs-repo` has been updated by the following command,
+Now, we are going to verify whether the backed up data is in the backend. Once a backup is completed, Stash will update the respective `Repository` CRD to reflect the backup completion. Check that the repository `redis-standalone-repo` has been updated by the following command,
 
 ```bash
-$ kubectl get repository -n demo gcs-repo
-NAME       INTEGRITY   SIZE        SNAPSHOT-COUNT   LAST-SUCCESSFUL-BACKUP   AGE
-gcs-repo   true        6.815 MiB   1                3m39s                    30m
+$ kubectl get repository -n demo redis-standalone-repo
+NAME                    INTEGRITY   SIZE    SNAPSHOT-COUNT   LAST-SUCCESSFUL-BACKUP   AGE
+redis-standalone-repo   true        133 B   1                                         115m
 ```
 
-Now, if we navigate to the GCS bucket, we will see the backed up data has been stored in `demo/redis/sample-redis` directory as specified by `.spec.backend.gcs.prefix` field of Repository CRD.
+Now, if we navigate to the GCS bucket, we will see the backed up data has been stored in `redisdump` directory as specified by `.spec.backend.gcs.prefix` field of Repository CRD.
 
 <figure align="center">
   <img alt="Backup data in GCS Bucket" src="../images/sample-redis-backup.png">
@@ -423,8 +373,8 @@ Now, wait for a moment. Stash will pause the BackupConfiguration. Verify that th
 
 ```console
 $ kubectl get backupconfiguration -n demo sample-redis-backup
-NAME                 TASK                  SCHEDULE      PAUSED   AGE
-sample-redis-backup  redis-backup-{{< param "info.subproject_version" >}}   */5 * * * *   true     26m
+NAMESPACE   NAME                  TASK                       SCHEDULE      PAUSED   AGE
+demo        sample-redis-backup   redis-backup-{{< param "info.subproject_version" >}}   */5 * * * *   true     25m
 ```
 
 Notice the `PAUSED` column. Value `true` for this field means that the BackupConfiguration has been paused.
@@ -433,38 +383,33 @@ Notice the `PAUSED` column. Value `true` for this field means that the BackupCon
 
 Now, we have to deploy the restored database similarly as we have deployed the original `sample-redis` database. However, this time there will be the following differences:
 
-- We have to use the same secret that was used in the original database. We are going to specify it using `.spec.databaseSecret` field.
 - We have to specify `.spec.init` section to tell KubeDB that we are going to use Stash to initialize this database from backup. KubeDB will keep the database phase to **`Initializing`** until Stash finishes its initialization.
 
 Below is the YAML for `Redis` CRD we are going deploy to initialize from backup,
 
 ```yaml
-apiVersion: kubedb.com/v1alpha1
+apiVersion: kubedb.com/v1alpha2
 kind: Redis
 metadata:
-  name: restored-redis
+  name: redis-recovery-test
   namespace: demo
 spec:
-  version: "5.0.3"
-  databaseSecret:
-    secretName: sample-redis-auth
-  replicas: 1
+  version: 5.0.3-v1
   storageType: Durable
   storage:
+    storageClassName: "standard"
     accessModes:
-      - ReadWriteOnce
+    - ReadWriteOnce
     resources:
       requests:
-        storage: 50Mi
+        storage: 1Gi
   init:
-    stashRestoreSession:
-      name: sample-redis-restore
-  terminationPolicy: WipeOut
+    waitForInitialRestore: true
 ```
 
 Here,
 
-- `spec.init.stashRestoreSession.name` specifies the `RestoreSession` CRD name that we will use later to restore the database.
+- `spec.init.stash.name` specifies the `RestoreSession` CRD name that we will use later to restore the database.
 
 Let's create the above database,
 
@@ -476,26 +421,26 @@ redis.kubedb.com/restored-redis created
 If you check the database status, you will see it is stuck in **`Initializing`** state.
 
 ```bash
-$ kubectl get my -n demo restored-redis
-NAME             VERSION   STATUS         AGE
-restored-redis   5.0.3    Initializing   61s
+$ kubectl get my -n demo redis-recovery-test
+NAMESPACE   NAME                  VERSION    STATUS         AGE
+demo        redis-recovery-test   5.0.3-v1   Initializing   78s
 ```
 
 **Create RestoreSession:**
 
 Now, we need to create a RestoreSession CRD pointing to the AppBinding for this restored database.
 
-Using the following command, check that another AppBinding object has been created for the `restored-redis` object,
+Using the following command, check that another AppBinding object has been created for the `redis-recovery-test` object,
 
 ```bash
-$ kubectl get appbindings -n demo restored-redis
-NAME             AGE
-restored-redis   6m6s
+$ kubectl get appbindings -n demo redis-recovery-test
+NAME                  TYPE               VERSION   AGE
+redis-recovery-test   kubedb.com/redis   5.0.3     3m34s
 ```
 
 > If you are not using KubeDB to deploy database, create the AppBinding manually.
 
-Below is the contents of YAML file of the RestoreSession CRD that we are going to create to restore backed up data into the newly created database provisioned by Redis CRD named `restored-redis`.
+Below is the contents of YAML file of the RestoreSession CRD that we are going to create to restore backed up data into the newly created database provisioned by Redis CRD named `redis-recovery-test`.
 
 ```yaml
 apiVersion: stash.appscode.com/v1beta1
@@ -509,12 +454,12 @@ spec:
   task:
     name: redis-restore-{{< param "info.subproject_version" >}}
   repository:
-    name: gcs-repo
+    name: redis-standalone-repo
   target:
     ref:
       apiVersion: appcatalog.appscode.com/v1alpha1
       kind: AppBinding
-      name: restored-redis
+      name: redis-recovery-test
   rules:
     - snapshots: [latest]
 ```
@@ -541,11 +486,11 @@ Once, you have created the RestoreSession object, Stash will create a restore Jo
 Run the following command to watch the phase of the RestoreSession object,
 
 ```bash
-$ watch -n 1 kubectl get restoresession -n demo restore-sample-redis
+$ watch -n 1 kubectl get restoresession -n demo sample-redis-restore
 
-Every 1.0s: kubectl get restoresession -n demo  restore-sample-redis    workstation: Fri Sep 27 11:18:51 2019
-NAMESPACE   NAME                   REPOSITORY-NAME   PHASE       AGE
-demo        restore-sample-redis   gcs-repo          Succeeded   59s
+Every 1.0s: kubectl get restoresession -n demo  sample-redis-restore    workstation: Fri Sep 27 11:18:51 2019
+NAMESPACE   NAME                   REPOSITORY              PHASE       AGE
+demo        sample-redis-restore   redis-standalone-repo   Succeeded   3m2s
 ```
 
 Here, we can see from the output of the above command that the restore process succeeded.
@@ -557,81 +502,36 @@ In this section, we are going to verify whether the desired data has been restor
 At first, check if the database has gone into **`Running`** state by the following command,
 
 ```bash
-$ kubectl get my -n demo restored-redis
-NAME             VERSION   STATUS    AGE
-restored-redis   5.0.3    Running   34m
+$ kubectl get redis -n demo redis-recovery-test
+NAME                  VERSION    STATUS    AGE
+redis-recovery-test   5.0.3-v1   Running   6m50s
 ```
 
 Now, find out the database Pod by the following command,
 
 ```bash
-$ kubectl get pods -n demo --selector="kubedb.com/name=restored-redis"
-NAME               READY   STATUS    RESTARTS   AGE
-restored-redis-0   1/1     Running   0          39m
+$ kubectl get pods -n demo --selector="kubedb.com/name=redis-recovery-test"
+NAME                    READY   STATUS    RESTARTS   AGE
+redis-recovery-test-0   1/1     Running   0          7m46s
 ```
 
-And then copy the user name and password of the `root` user to access into `redis` shell.
 
-> Notice: We used the same Secret for the `restored-redis` object. So, we will use the same commands as before.
-
+Now, let's exec into the Pod to enter into `redis` shell and verify that the previous data that we just restored are found in the `redis` instance:
 ```bash
-$ kubectl get secret -n demo  sample-redis-auth -o jsonpath='{.data.username}'| base64 -d
-root⏎
-
-$ kubectl get secret -n demo  sample-redis-auth -o jsonpath='{.data.password}'| base64 -d
-5HEqoozyjgaMO97N⏎
+$ kubectl exec -it redis-recovery-test-0 -n demo -- sh
+/data # redis-cli
+127.0.0.1:6379> get hello
+"world"
+127.0.0.1:6379> get stash
+"backup"
+127.0.0.1:6379> get AppsCode
+"KubeDB"
+127.0.0.1:6379> get random
+(nil)
+127.0.0.1:6379> exit
+/data # exit
 ```
-
-Now, let's exec into the Pod to enter into `redis` shell and create a database and a table,
-
-```bash
-$ kubectl exec -it -n demo restored-redis-0 -- redis --user=root --password=5HEqoozyjgaMO97N
-redis: [Warning] Using a password on the command line interface can be insecure.
-Welcome to the Redis monitor.  Commands end with ; or \g.
-Your Redis connection id is 9
-Server version: 5.0.3 Redis Community Server - GPL
-
-Copyright (c) 2000, 2019, Oracle and/or its affiliates. All rights reserved.
-
-Oracle is a registered trademark of Oracle Corporation and/or its
-affiliates. Other names may be trademarks of their respective
-owners.
-
-Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
-
-redis> SHOW DATABASES;
-+--------------------+
-| Database           |
-+--------------------+
-| information_schema |
-| redis              |
-| performance_schema |
-| playground         |
-| sys                |
-+--------------------+
-5 rows in set (0.00 sec)
-
-redis> SHOW TABLES IN playground;
-+----------------------+
-| Tables_in_playground |
-+----------------------+
-| equipment            |
-+----------------------+
-1 row in set (0.00 sec)
-
-redis> SELECT * FROM playground.equipment;
-+----+-------+-------+-------+
-| id | type  | quant | color |
-+----+-------+-------+-------+
-|  1 | slide |     2 | blue  |
-+----+-------+-------+-------+
-1 row in set (0.00 sec)
-
-redis> exit
-Bye
-```
-
-So, from the above output, we can see that the `playground` database and the `equipment` table we created earlier in the original database and now, they are restored successfully.
+So, from the above output, we can see that the data we stored in the previous `sample-redis` database before taking backup is restored into the new `redis-recovery-test` instance, they are restored successfully.
 
 ## Cleanup
 
