@@ -13,11 +13,11 @@ image:
   repository: stash-redis
   # Tag of the image that is used to backup/restore Redis database.
   # This is usually same as the database version it can backup.
-  tag: v2020.09.16
+  tag: 5.0.3
 # optional argument to send redisdump or redis command
 backup:
-  # Arguments to pass to `redisdump` command  during bakcup process
-  args: "--all-databases"
+  # Arguments to pass to `redis-dump-go` command  during bakcup process
+  args: ""
 restore:
   # Arguments to pass to `redis` command during restore process
   args: ""
