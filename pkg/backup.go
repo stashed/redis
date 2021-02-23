@@ -204,8 +204,8 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 
 	// set env for redisdump
 	resticWrapper.SetEnv(EnvRedisPassword, string(appBindingSecret.Data[RedisPassword]))
-	// setup pipe command
-	opt.backupOptions.StdinPipeCommand = restic.Command{
+	// setup backup command
+	backupCmd := restic.Command{
 		Name: RedisDumpCMD,
 		Args: []interface{}{
 			"-u", string(appBindingSecret.Data[RedisUser]),
@@ -213,7 +213,7 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 		},
 	}
 	for _, arg := range strings.Fields(opt.myArgs) {
-		opt.backupOptions.StdinPipeCommand.Args = append(opt.backupOptions.StdinPipeCommand.Args, arg)
+		backupCmd.Args = append(backupCmd.Args, arg)
 	}
 
 	// wait for DB ready
@@ -221,6 +221,9 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 	if err != nil {
 		return nil, err
 	}
+
+	// add backup command to the pipeline
+	opt.backupOptions.StdinPipeCommands = append(opt.backupOptions.StdinPipeCommands, backupCmd)
 
 	// Run backup
 	return resticWrapper.RunBackup(opt.backupOptions, targetRef)
