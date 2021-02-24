@@ -503,7 +503,7 @@ metadata:
   name: sample-redis-restore
   namespace: demo
   labels:
-    kubedb.com/kind: Redis # this label is mandatory if you are using KubeDB to deploy the database.
+    app.kubernetes.io/name: redises.kubedb.com # this label is mandatory if you are using KubeDB to deploy the database.
 spec:
   task:
     name: redis-restore-{{< param "info.subproject_version" >}}
@@ -526,7 +526,7 @@ Here,
 - `.spec.target.ref` refers to the newly created AppBinding object for the `restored-redis` Redis object.
 - `.spec.rules` specifies that we are restoring data from the latest backup snapshot of the database.
 
-> **Warning:** Label `kubedb.com/kind: Redis` is mandatory if you are using KubeDB to deploy the database. Otherwise, the database will be stuck in **`Initializing`** state.
+> **Warning:** Label `app.kubernetes.io/name: redises.kubedb.com` is mandatory if you are using KubeDB to deploy the database. Otherwise, the database will be stuck in **`Provisioning`** state.
 
 Let's create the RestoreSession CRD object we have shown above,
 

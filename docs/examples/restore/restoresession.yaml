@@ -4,7 +4,7 @@ metadata:
   name: restore-sample-redis
   namespace: demo
   labels:
-    kubedb.com/kind: Redis # this label is mandatory if you are using KubeDB to deploy the database.
+    app.kubernetes.io/name: redises.kubedb.com # this label is mandatory if you are using KubeDB to deploy the database.
 spec:
   task:
     name: redis-restore-5.0.3
