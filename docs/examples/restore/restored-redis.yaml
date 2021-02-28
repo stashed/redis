@@ -1,12 +1,12 @@
-apiVersion: kubedb.com/v1alpha1
+apiVersion: kubedb.com/v1alpha2
 kind: Redis
 metadata:
   name: restored-redis
   namespace: demo
 spec:
   version: "5.0.3"
-  databaseSecret:
-    secretName: sample-redis-auth
+  authSecret:
+    name: sample-redis-auth
   replicas: 1
   storageType: Durable
   storage:
@@ -16,6 +16,5 @@ spec:
       requests:
         storage: 50Mi
   init:
-    stashRestoreSession:
-      name: restore-sample-redis
+    waitForInitialRestore: true
   terminationPolicy: WipeOut

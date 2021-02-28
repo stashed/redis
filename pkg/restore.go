@@ -173,8 +173,8 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 
 	// set env for redis
 	resticWrapper.SetEnv(EnvRedisPassword, string(appBindingSecret.Data[RedisPassword]))
-	// setup pipe command
-	opt.dumpOptions.StdoutPipeCommand = restic.Command{
+	// setup restore command
+	restoreCmd := restic.Command{
 		Name: RedisRestoreCMD,
 		Args: []interface{}{
 			"-u", string(appBindingSecret.Data[RedisUser]),
@@ -182,7 +182,7 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 		},
 	}
 	for _, arg := range strings.Fields(opt.myArgs) {
-		opt.dumpOptions.StdoutPipeCommand.Args = append(opt.dumpOptions.StdoutPipeCommand.Args, arg)
+		restoreCmd.Args = append(restoreCmd.Args, arg)
 	}
 
 	// wait for DB ready
@@ -190,6 +190,9 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 	if err != nil {
 		return nil, err
 	}
+
+	// add restore command to the pipeline
+	opt.dumpOptions.StdoutPipeCommands = append(opt.dumpOptions.StdoutPipeCommands, restoreCmd)
 
 	// Run dump
 	return resticWrapper.Dump(opt.dumpOptions, targetRef)
