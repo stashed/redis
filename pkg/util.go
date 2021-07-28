@@ -67,14 +67,18 @@ type SessionWrapper struct {
 	*shell.Session
 }
 
+func NewSessionWrapper() *SessionWrapper {
+	return &SessionWrapper{
+		shell.NewSession(),
+	}
+}
 func (wrapper *SessionWrapper) SetEnv(key, value string) {
 	wrapper.Session.SetEnv(key, value)
 }
 
 func (opt *redisOptions) waitForDBReady(appBinding *appcatalog.AppBinding) error {
 	klog.Infoln("Waiting for the database to be ready.....")
-	var sh *SessionWrapper
-	sh.Session = shell.NewSession()
+	sh := NewSessionWrapper()
 	args := []interface{}{
 		"-h", appBinding.Spec.ClientConfig.Service.Name,
 		"ping",

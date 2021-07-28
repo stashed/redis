@@ -27,7 +27,7 @@ RUN set -x                                                                      
   && chmod 755 restic
 
 RUN set -x                                                                                                                                                          \
-  && curl -fsSL -o redis-dump-go.tar.gz https://github.com/yannh/redis-dump-go/releases/download/v{REDIS_DUMP_VER}/redis-dump-go-{ARG_OS}-{ARG_ARCH}.tar.gz         \
+  && curl -fsSL -o redis-dump-go.tar.gz https://github.com/yannh/redis-dump-go/releases/download/v{REDIS_DUMP_VER}/redis-dump-go_{REDIS_DUMP_VER}_{ARG_OS}_{ARG_ARCH}.tar.gz         \
   && tar -xzf redis-dump-go.tar.gz                                                                                                                                  \
   && chmod 755 redis-dump-go
 
