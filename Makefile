@@ -59,8 +59,8 @@ BIN_PLATFORMS    := $(DOCKER_PLATFORMS)
 OS   := $(if $(GOOS),$(GOOS),$(shell go env GOOS))
 ARCH := $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
 
-BASEIMAGE_PROD   ?= redis:5.0.3
-BASEIMAGE_DBG    ?= redis:5.0.3
+BASEIMAGE_PROD   ?= redis:6.2.5
+BASEIMAGE_DBG    ?= redis:6.2.5
 
 IMAGE            := $(REGISTRY)/$(BIN)
 VERSION_PROD     := $(VERSION)

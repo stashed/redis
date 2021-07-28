@@ -109,7 +109,7 @@ func NewCmdRestore() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&opt.myArgs, "redis-args", opt.myArgs, "Additional arguments")
+	cmd.Flags().StringVar(&opt.redisArgs, "redis-args", opt.redisArgs, "Additional arguments")
 	cmd.Flags().Int32Var(&opt.waitTimeout, "wait-timeout", opt.waitTimeout, "Time limit to wait for the database to be ready")
 
 	cmd.Flags().StringVar(&masterURL, "master", masterURL, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
@@ -161,27 +161,36 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
+	// set access credentials
+	err = opt.setCredentials(resticWrapper, appBinding)
+	if err != nil {
+		return nil, err
+	}
+
 	// setup pipe command
-	opt.dumpOptions.StdoutPipeCommand = restic.Command{
+	restoreCmd := restic.Command{
 		Name: RedisRestoreCMD,
 		Args: []interface{}{
 			"--pipe",
 			"-h", appBinding.Spec.ClientConfig.Service.Name,
 		},
 	}
-	for _, arg := range strings.Fields(opt.myArgs) {
-		opt.dumpOptions.StdoutPipeCommand.Args = append(opt.dumpOptions.StdoutPipeCommand.Args, arg)
+	for _, arg := range strings.Fields(opt.redisArgs) {
+		restoreCmd.Args = append(restoreCmd.Args, arg)
 	}
 	// if port is specified, append port in the arguments
 	if appBinding.Spec.ClientConfig.Service.Port != 0 {
-		opt.backupOptions.StdinPipeCommand.Args = append(opt.backupOptions.StdinPipeCommand.Args, "-p", strconv.Itoa(int(appBinding.Spec.ClientConfig.Service.Port)))
+		restoreCmd.Args = append(restoreCmd.Args, "-p", strconv.Itoa(int(appBinding.Spec.ClientConfig.Service.Port)))
 	}
 
 	// wait for DB ready
-	err = waitForDBReady(appBinding)
+	err = opt.waitForDBReady(appBinding)
 	if err != nil {
 		return nil, err
 	}
+
+	// append the restore command to the pipeline
+	opt.dumpOptions.StdoutPipeCommands = append(opt.dumpOptions.StdoutPipeCommands, restoreCmd)
 
 	// Run dump
 	return resticWrapper.Dump(opt.dumpOptions, targetRef)

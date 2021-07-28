@@ -43,8 +43,6 @@ func NewCmdBackup() *cobra.Command {
 		masterURL      string
 		kubeconfigPath string
 		opt            = redisOptions{
-
-			myArgs:      "--all-databases",
 			waitTimeout: 300,
 			setupOptions: restic.SetupOptions{
 				ScratchDir:  restic.DefaultScratchDir,
@@ -116,7 +114,7 @@ func NewCmdBackup() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&opt.myArgs, "redis-args", opt.myArgs, "Additional arguments")
+	cmd.Flags().StringVar(&opt.redisArgs, "redis-args", opt.redisArgs, "Additional arguments")
 	cmd.Flags().Int32Var(&opt.waitTimeout, "wait-timeout", opt.waitTimeout, "Time limit to wait for the database to be ready")
 
 	cmd.Flags().StringVar(&masterURL, "master", masterURL, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
@@ -192,26 +190,36 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
+	// set access credentials
+	err = opt.setCredentials(resticWrapper, appBinding)
+	if err != nil {
+		return nil, err
+	}
+
 	// setup pipe command
-	opt.backupOptions.StdinPipeCommand = restic.Command{
+	backupCmd := restic.Command{
 		Name: RedisDumpCMD,
 		Args: []interface{}{
 			"-host", appBinding.Spec.ClientConfig.Service.Name,
 		},
 	}
-	for _, arg := range strings.Fields(opt.myArgs) {
-		opt.backupOptions.StdinPipeCommand.Args = append(opt.backupOptions.StdinPipeCommand.Args, arg)
+	for _, arg := range strings.Fields(opt.redisArgs) {
+		backupCmd.Args = append(backupCmd.Args, arg)
 	}
+
 	// if port is specified, append port in the arguments
 	if appBinding.Spec.ClientConfig.Service.Port != 0 {
-		opt.backupOptions.StdinPipeCommand.Args = append(opt.backupOptions.StdinPipeCommand.Args, "-port", strconv.Itoa(int(appBinding.Spec.ClientConfig.Service.Port)))
+		backupCmd.Args = append(backupCmd.Args, "-port", strconv.Itoa(int(appBinding.Spec.ClientConfig.Service.Port)))
 	}
 
 	// wait for DB ready
-	err = waitForDBReady(appBinding)
+	err = opt.waitForDBReady(appBinding)
 	if err != nil {
 		return nil, err
 	}
+
+	// add backup command in the pipeline
+	opt.backupOptions.StdinPipeCommands = append(opt.backupOptions.StdinPipeCommands, backupCmd)
 
 	// Run backup
 	return resticWrapper.RunBackup(opt.backupOptions, targetRef)
