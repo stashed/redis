@@ -49,5 +49,6 @@ COPY --from=0 /restic /bin/restic
 COPY --from=0 redis-dump-go /bin/redis-dump-go
 COPY bin/{ARG_OS}_{ARG_ARCH}/{ARG_BIN} /{ARG_BIN}
 
+USER nobody
 
 ENTRYPOINT ["/{ARG_BIN}"]
