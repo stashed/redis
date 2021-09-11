@@ -42,7 +42,7 @@ else
 	endif
 endif
 
-RESTIC_VER       := 0.12.0-ac.20210727
+RESTIC_VER       := 0.12.1
 REDIS_DUMP_VER   := 0.5.1
 
 ###
