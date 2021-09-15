@@ -178,6 +178,12 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 	for _, arg := range strings.Fields(opt.redisArgs) {
 		restoreCmd.Args = append(restoreCmd.Args, arg)
 	}
+	if appBinding.Spec.ClientConfig.CABundle != nil {
+		restoreCmd.Args, err = opt.setTlsArgsForRedisClient(appBinding, restoreCmd.Args)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// if port is specified, append port in the arguments
 	if appBinding.Spec.ClientConfig.Service.Port != 0 {
 		restoreCmd.Args = append(restoreCmd.Args, "-p", strconv.Itoa(int(appBinding.Spec.ClientConfig.Service.Port)))
