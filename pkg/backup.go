@@ -206,6 +206,12 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 	for _, arg := range strings.Fields(opt.redisArgs) {
 		backupCmd.Args = append(backupCmd.Args, arg)
 	}
+	if appBinding.Spec.ClientConfig.CABundle != nil {
+		backupCmd.Args, err = opt.setTlsArgsForRedisClient(appBinding, backupCmd.Args)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	// if port is specified, append port in the arguments
 	if appBinding.Spec.ClientConfig.Service.Port != 0 {
@@ -220,7 +226,6 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 
 	// add backup command in the pipeline
 	opt.backupOptions.StdinPipeCommands = append(opt.backupOptions.StdinPipeCommands, backupCmd)
-
 	// Run backup
 	return resticWrapper.RunBackup(opt.backupOptions, targetRef)
 }
