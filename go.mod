@@ -9,6 +9,7 @@ require (
 	gomodules.xyz/go-sh v0.1.0
 	gomodules.xyz/logs v0.0.4
 	gomodules.xyz/x v0.0.8
+	k8s.io/api v0.21.1
 	k8s.io/apimachinery v0.21.1
 	k8s.io/client-go v0.21.1
 	k8s.io/klog/v2 v2.8.0
@@ -16,6 +17,7 @@ require (
 	kmodules.xyz/custom-resources v0.0.0-20210829135624-c63be82e13c0
 	kmodules.xyz/objectstore-api v0.0.0-20210829122106-d39859fc2d56 // indirect
 	kmodules.xyz/offshoot-api v0.0.0-20210804100837-d0388be3e60d
+	kubedb.dev/apimachinery v0.21.1-0.20210915153024-84659c4a8fca
 	stash.appscode.dev/apimachinery v0.15.0
 )
 

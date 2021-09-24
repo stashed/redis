@@ -18,18 +18,24 @@ package pkg
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"time"
 
 	stash "stash.appscode.dev/apimachinery/client/clientset/versioned"
 	"stash.appscode.dev/apimachinery/pkg/restic"
 
 	shell "gomodules.xyz/go-sh"
+	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
+	"kubedb.dev/apimachinery/apis/config/v1alpha1"
 )
 
 const (
@@ -78,19 +84,26 @@ func (wrapper *SessionWrapper) SetEnv(key, value string) {
 
 func (opt *redisOptions) waitForDBReady(appBinding *appcatalog.AppBinding) error {
 	klog.Infoln("Waiting for the database to be ready.....")
+	var err error
 	sh := NewSessionWrapper()
+	sh.ShowCMD = true
 	args := []interface{}{
 		"-h", appBinding.Spec.ClientConfig.Service.Name,
-		"ping",
 	}
-
+	if appBinding.Spec.ClientConfig.CABundle != nil {
+		args, err = opt.setTlsArgsForRedisClient(appBinding, args)
+		if err != nil {
+			return err
+		}
+	}
 	//if port is specified, append port in the arguments
 	if appBinding.Spec.ClientConfig.Service.Port != 0 {
-		args = append(args, "-p", appBinding.Spec.ClientConfig.Service.Port)
+		args = append(args, "-p", fmt.Sprintf("%d", appBinding.Spec.ClientConfig.Service.Port))
 	}
+	args = append(args, "ping")
 
 	// set access credentials
-	err := opt.setCredentials(sh, appBinding)
+	err = opt.setCredentials(sh, appBinding)
 	if err != nil {
 		return err
 	}
@@ -128,4 +141,52 @@ func (opt *redisOptions) setCredentials(sh Shell, appBinding *appcatalog.AppBind
 	// set auth env for redis-dump-go
 	sh.SetEnv(EnvRedisDumpGoAuth, string(secret.Data[RedisPassword]))
 	return nil
+}
+
+func (opt *redisOptions) setTlsArgsForRedisClient(appBinding *appcatalog.AppBinding, args []interface{}) ([]interface{}, error) {
+
+	parameters := v1alpha1.RedisConfiguration{}
+	if appBinding.Spec.Parameters != nil {
+		if err := json.Unmarshal(appBinding.Spec.Parameters.Raw, &parameters); err != nil {
+			klog.Errorf("unable to unmarshal appBinding.Spec.Parameters.Raw. Reason: %v", err)
+		}
+	}
+	if appBinding.Spec.ClientConfig.CABundle != nil {
+		if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey), appBinding.Spec.ClientConfig.CABundle, 0600); err != nil {
+			return nil, err
+		}
+		caPath := filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey)
+		args = append(args, "--tls")
+		args = append(args, "--cacert", caPath)
+	}
+
+	if parameters.ClientCertSecret != nil {
+		clientSecret, err := opt.kubeClient.CoreV1().Secrets(opt.namespace).Get(context.TODO(), parameters.ClientCertSecret.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		certByte, ok := clientSecret.Data[core.TLSCertKey]
+		if !ok {
+			return nil, fmt.Errorf("can't find client cert")
+		}
+		if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey), certByte, 0600); err != nil {
+			return nil, err
+		}
+		certPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey)
+
+		keyByte, ok := clientSecret.Data[core.TLSPrivateKeyKey]
+		if !ok {
+			return nil, fmt.Errorf("can't find client private key")
+		}
+
+		if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey), keyByte, 0600); err != nil {
+			return nil, err
+		}
+		keyPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey)
+
+		args = append(args, "--cert", certPath, "--key", keyPath)
+	}
+
+	return args, nil
 }
