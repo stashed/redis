@@ -4,7 +4,7 @@ go 1.15
 
 require (
 	github.com/spf13/cobra v1.1.3
-	go.bytebuilders.dev/license-verifier/kubernetes v0.9.6
+	go.bytebuilders.dev/license-verifier/kubernetes v0.9.7
 	gomodules.xyz/flags v0.1.3
 	gomodules.xyz/go-sh v0.1.0
 	gomodules.xyz/logs v0.0.6
