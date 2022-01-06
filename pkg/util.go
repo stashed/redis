@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	kmapi "kmodules.xyz/client-go/api/v1"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	"kubedb.dev/apimachinery/apis/config/v1alpha1"
@@ -59,6 +60,7 @@ type redisOptions struct {
 	redisArgs         string
 	waitTimeout       int32
 	outputDir         string
+	storageSecret     kmapi.ObjectReference
 
 	setupOptions  restic.SetupOptions
 	backupOptions restic.BackupOptions
@@ -87,8 +89,20 @@ func (opt *redisOptions) waitForDBReady(appBinding *appcatalog.AppBinding) error
 	var err error
 	sh := NewSessionWrapper()
 	sh.ShowCMD = true
+
+	hostname, err := appBinding.Hostname()
+	if err != nil {
+		return err
+	}
+
+	port, err := appBinding.Port()
+	if err != nil {
+		return err
+	}
+
 	args := []interface{}{
-		"-h", appBinding.Spec.ClientConfig.Service.Name,
+		"-h", hostname,
+		"-p", fmt.Sprintf("%d", port),
 	}
 	if appBinding.Spec.ClientConfig.CABundle != nil {
 		args, err = opt.setTlsArgsForRedisClient(appBinding, args)
@@ -96,10 +110,7 @@ func (opt *redisOptions) waitForDBReady(appBinding *appcatalog.AppBinding) error
 			return err
 		}
 	}
-	//if port is specified, append port in the arguments
-	if appBinding.Spec.ClientConfig.Service.Port != 0 {
-		args = append(args, "-p", fmt.Sprintf("%d", appBinding.Spec.ClientConfig.Service.Port))
-	}
+
 	args = append(args, "ping")
 
 	// set access credentials
