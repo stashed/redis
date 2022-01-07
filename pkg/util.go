@@ -102,13 +102,17 @@ func (opt *redisOptions) waitForDBReady(appBinding *appcatalog.AppBinding) error
 
 	args := []interface{}{
 		"-h", hostname,
-		"-p", fmt.Sprintf("%d", port),
 	}
 	if appBinding.Spec.ClientConfig.CABundle != nil {
 		args, err = opt.setTlsArgsForRedisClient(appBinding, args)
 		if err != nil {
 			return err
 		}
+	}
+
+	// if port is specified, append port in the arguments
+	if port != 0 {
+		args = append(args, "-p", fmt.Sprintf("%d", port))
 	}
 
 	args = append(args, "ping")

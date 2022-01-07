@@ -18,8 +18,8 @@ package pkg
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
@@ -215,9 +215,9 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 		Name: RedisDumpCMD,
 		Args: []interface{}{
 			"-host", hostname,
-			"-port", fmt.Sprintf("%d", port),
 		},
 	}
+
 	for _, arg := range strings.Fields(opt.redisArgs) {
 		backupCmd.Args = append(backupCmd.Args, arg)
 	}
@@ -226,6 +226,11 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// if port is specified, append port in the arguments
+	if port != 0 {
+		backupCmd.Args = append(backupCmd.Args, "-port", strconv.Itoa(int(port)))
 	}
 
 	err = opt.waitForDBReady(appBinding)

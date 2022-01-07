@@ -18,8 +18,8 @@ package pkg
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
@@ -187,7 +187,6 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 		Args: []interface{}{
 			"--pipe",
 			"-h", hostname,
-			"-p", fmt.Sprintf("%d", port),
 		},
 	}
 	for _, arg := range strings.Fields(opt.redisArgs) {
@@ -198,6 +197,11 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// if port is specified, append port in the arguments
+	if port != 0 {
+		restoreCmd.Args = append(restoreCmd.Args, "-p", strconv.Itoa(int(port)))
 	}
 
 	err = opt.waitForDBReady(appBinding)
