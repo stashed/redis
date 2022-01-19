@@ -20,7 +20,6 @@ import (
 	"context"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
 	stash "stash.appscode.dev/apimachinery/client/clientset/versioned"
@@ -189,13 +188,19 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
-	resticWrapper, err := restic.NewResticWrapper(opt.setupOptions)
+	session := opt.newSessionWrapper(RedisDumpCMD)
+
+	err = session.setDatabaseCredentials(opt.kubeClient, appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	// set access credentials
-	err = opt.setCredentials(resticWrapper, appBinding)
+	err = opt.setTLSParameters(appBinding, session.cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	err = session.waitForDBReady(appBinding)
 	if err != nil {
 		return nil, err
 	}
@@ -205,41 +210,24 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
+	session.cmd.Args = append(session.cmd.Args, "-host", hostname)
+
 	port, err := appBinding.Port()
 	if err != nil {
 		return nil, err
 	}
 
-	// setup pipe command
-	backupCmd := restic.Command{
-		Name: RedisDumpCMD,
-		Args: []interface{}{
-			"-host", hostname,
-		},
-	}
-
-	for _, arg := range strings.Fields(opt.redisArgs) {
-		backupCmd.Args = append(backupCmd.Args, arg)
-	}
-	if appBinding.Spec.ClientConfig.CABundle != nil {
-		backupCmd.Args, err = opt.setTlsArgsForRedisClient(appBinding, backupCmd.Args)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// if port is specified, append port in the arguments
 	if port != 0 {
-		backupCmd.Args = append(backupCmd.Args, "-port", strconv.Itoa(int(port)))
+		session.cmd.Args = append(session.cmd.Args, "-port", strconv.Itoa(int(port)))
 	}
 
-	err = opt.waitForDBReady(appBinding)
+	session.setUserArgs(opt.redisArgs)
+	// add backup command in the pipeline
+	opt.backupOptions.StdinPipeCommands = append(opt.backupOptions.StdinPipeCommands, *session.cmd)
+	resticWrapper, err := restic.NewResticWrapperFromShell(opt.setupOptions, session.sh)
 	if err != nil {
 		return nil, err
 	}
-
-	// add backup command in the pipeline
-	opt.backupOptions.StdinPipeCommands = append(opt.backupOptions.StdinPipeCommands, backupCmd)
-
 	return resticWrapper.RunBackup(opt.backupOptions, targetRef)
 }

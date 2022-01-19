@@ -20,7 +20,6 @@ import (
 	"context"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
 	"stash.appscode.dev/apimachinery/pkg/restic"
@@ -160,58 +159,48 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	resticWrapper, err := restic.NewResticWrapper(opt.setupOptions)
+	session := opt.newSessionWrapper(RedisRestoreCMD)
+
+	err = session.setDatabaseCredentials(opt.kubeClient, appBinding)
 	if err != nil {
 		return nil, err
 	}
 
-	// set access credentials
-	err = opt.setCredentials(resticWrapper, appBinding)
+	err = opt.setTLSParameters(appBinding, session.cmd)
 	if err != nil {
 		return nil, err
 	}
+
+	err = session.waitForDBReady(appBinding)
+	if err != nil {
+		return nil, err
+	}
+
+	session.cmd.Args = append(session.cmd.Args, "--pipe")
 
 	hostname, err := appBinding.Hostname()
 	if err != nil {
 		return nil, err
 	}
+	session.cmd.Args = append(session.cmd.Args, "-h", hostname)
 
 	port, err := appBinding.Port()
 	if err != nil {
 		return nil, err
 	}
-
-	// setup pipe command
-	restoreCmd := restic.Command{
-		Name: RedisRestoreCMD,
-		Args: []interface{}{
-			"--pipe",
-			"-h", hostname,
-		},
-	}
-	for _, arg := range strings.Fields(opt.redisArgs) {
-		restoreCmd.Args = append(restoreCmd.Args, arg)
-	}
-	if appBinding.Spec.ClientConfig.CABundle != nil {
-		restoreCmd.Args, err = opt.setTlsArgsForRedisClient(appBinding, restoreCmd.Args)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// if port is specified, append port in the arguments
 	if port != 0 {
-		restoreCmd.Args = append(restoreCmd.Args, "-p", strconv.Itoa(int(port)))
+		session.cmd.Args = append(session.cmd.Args, "-p", strconv.Itoa(int(port)))
 	}
 
-	err = opt.waitForDBReady(appBinding)
+	session.setUserArgs(opt.redisArgs)
+
+	// append the restore command to the pipeline
+	opt.dumpOptions.StdoutPipeCommands = append(opt.dumpOptions.StdoutPipeCommands, *session.cmd)
+	resticWrapper, err := restic.NewResticWrapperFromShell(opt.setupOptions, session.sh)
 	if err != nil {
 		return nil, err
 	}
-
-	// append the restore command to the pipeline
-	opt.dumpOptions.StdoutPipeCommands = append(opt.dumpOptions.StdoutPipeCommands, restoreCmd)
-
 	// Run dump
 	return resticWrapper.Dump(opt.dumpOptions, targetRef)
 }
