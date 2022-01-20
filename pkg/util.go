@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	stash "stash.appscode.dev/apimachinery/client/clientset/versioned"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	kmapi "kmodules.xyz/client-go/api/v1"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	"kubedb.dev/apimachinery/apis/config/v1alpha1"
@@ -59,54 +62,127 @@ type redisOptions struct {
 	redisArgs         string
 	waitTimeout       int32
 	outputDir         string
+	storageSecret     kmapi.ObjectReference
 
 	setupOptions  restic.SetupOptions
 	backupOptions restic.BackupOptions
 	dumpOptions   restic.DumpOptions
 }
 
-type Shell interface {
-	SetEnv(key, value string)
+type sessionWrapper struct {
+	sh  *shell.Session
+	cmd *restic.Command
 }
 
-type SessionWrapper struct {
-	*shell.Session
-}
-
-func NewSessionWrapper() *SessionWrapper {
-	return &SessionWrapper{
-		shell.NewSession(),
+func (opt *redisOptions) newSessionWrapper(cmd string) *sessionWrapper {
+	return &sessionWrapper{
+		sh: shell.NewSession(),
+		cmd: &restic.Command{
+			Name: cmd,
+		},
 	}
 }
-func (wrapper *SessionWrapper) SetEnv(key, value string) {
-	wrapper.Session.SetEnv(key, value)
-}
 
-func (opt *redisOptions) waitForDBReady(appBinding *appcatalog.AppBinding) error {
-	klog.Infoln("Waiting for the database to be ready.....")
-	var err error
-	sh := NewSessionWrapper()
-	sh.ShowCMD = true
-	args := []interface{}{
-		"-h", appBinding.Spec.ClientConfig.Service.Name,
-	}
-	if appBinding.Spec.ClientConfig.CABundle != nil {
-		args, err = opt.setTlsArgsForRedisClient(appBinding, args)
-		if err != nil {
-			return err
-		}
-	}
-	//if port is specified, append port in the arguments
-	if appBinding.Spec.ClientConfig.Service.Port != 0 {
-		args = append(args, "-p", fmt.Sprintf("%d", appBinding.Spec.ClientConfig.Service.Port))
-	}
-	args = append(args, "ping")
-
-	// set access credentials
-	err = opt.setCredentials(sh, appBinding)
+func (session *sessionWrapper) setDatabaseCredentials(kubeClient kubernetes.Interface, appBinding *appcatalog.AppBinding) error {
+	appBindingSecret, err := kubeClient.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), appBinding.Spec.Secret.Name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
+
+	err = appBinding.TransformSecret(kubeClient, appBindingSecret.Data)
+	if err != nil {
+		return err
+	}
+
+	// set auth env for redis-cli
+	session.sh.SetEnv(EnvRedisCLIAuth, string(appBindingSecret.Data[RedisPassword]))
+
+	// set auth env for redis-dump-go
+	session.sh.SetEnv(EnvRedisDumpGoAuth, string(appBindingSecret.Data[RedisPassword]))
+
+	return nil
+}
+
+func (opt redisOptions) setTLSParameters(appBinding *appcatalog.AppBinding, cmd *restic.Command) error {
+	// if ssl enabled, add ca.crt in the arguments
+	if appBinding.Spec.ClientConfig.CABundle != nil {
+		parameters := v1alpha1.RedisConfiguration{}
+		if appBinding.Spec.Parameters != nil {
+			if err := json.Unmarshal(appBinding.Spec.Parameters.Raw, &parameters); err != nil {
+				klog.Errorf("unable to unmarshal appBinding.Spec.Parameters.Raw. Reason: %v", err)
+			}
+		}
+
+		if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey), appBinding.Spec.ClientConfig.CABundle, 0600); err != nil {
+			return err
+		}
+		caPath := filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey)
+		cmd.Args = append(cmd.Args, "--tls")
+		cmd.Args = append(cmd.Args, "--cacert", caPath)
+
+		if parameters.ClientCertSecret != nil {
+			clientSecret, err := opt.kubeClient.CoreV1().Secrets(opt.namespace).Get(context.TODO(), parameters.ClientCertSecret.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			certByte, ok := clientSecret.Data[core.TLSCertKey]
+			if !ok {
+				return fmt.Errorf("can't find client cert")
+			}
+			if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey), certByte, 0600); err != nil {
+				return err
+			}
+			certPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey)
+
+			keyByte, ok := clientSecret.Data[core.TLSPrivateKeyKey]
+			if !ok {
+				return fmt.Errorf("can't find client private key")
+			}
+
+			if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey), keyByte, 0600); err != nil {
+				return err
+			}
+			keyPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey)
+
+			cmd.Args = append(cmd.Args, "--cert", certPath, "--key", keyPath)
+		}
+	}
+	return nil
+}
+
+func (session *sessionWrapper) setUserArgs(args string) {
+	for _, arg := range strings.Fields(args) {
+		session.cmd.Args = append(session.cmd.Args, arg)
+	}
+}
+
+func (session sessionWrapper) waitForDBReady(appBinding *appcatalog.AppBinding) error {
+	klog.Infoln("Waiting for the database to be ready.....")
+	sh := shell.NewSession()
+	for k, v := range session.sh.Env {
+		sh.SetEnv(k, v)
+	}
+	sh.ShowCMD = true
+
+	hostname, err := appBinding.Hostname()
+	if err != nil {
+		return err
+	}
+
+	args := append(session.cmd.Args, "-h", hostname)
+
+	port, err := appBinding.Port()
+	if err != nil {
+		return err
+	}
+
+	// if port is specified, append port in the arguments
+	if port != 0 {
+		args = append(args, "-p", strconv.Itoa(int(port)))
+	}
+
+	args = append(args, "ping")
 
 	return wait.PollImmediate(time.Second*5, time.Minute*5, func() (bool, error) {
 		err := sh.Command("redis-cli", args...).Run()
@@ -115,78 +191,4 @@ func (opt *redisOptions) waitForDBReady(appBinding *appcatalog.AppBinding) error
 		}
 		return true, nil
 	})
-}
-
-func (opt *redisOptions) setCredentials(sh Shell, appBinding *appcatalog.AppBinding) error {
-	// if credential secret is not provided in AppBinding, then nothing to do.
-	if appBinding.Spec.Secret == nil {
-		return nil
-	}
-
-	// get the Secret
-	secret, err := opt.kubeClient.CoreV1().Secrets(opt.namespace).Get(context.TODO(), appBinding.Spec.Secret.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	// perform necessary transform if secretTransforms section is provided in the AppBinding
-	err = appBinding.TransformSecret(opt.kubeClient, secret.Data)
-	if err != nil {
-		return err
-	}
-
-	// set auth env for redis-cli
-	sh.SetEnv(EnvRedisCLIAuth, string(secret.Data[RedisPassword]))
-
-	// set auth env for redis-dump-go
-	sh.SetEnv(EnvRedisDumpGoAuth, string(secret.Data[RedisPassword]))
-	return nil
-}
-
-func (opt *redisOptions) setTlsArgsForRedisClient(appBinding *appcatalog.AppBinding, args []interface{}) ([]interface{}, error) {
-
-	parameters := v1alpha1.RedisConfiguration{}
-	if appBinding.Spec.Parameters != nil {
-		if err := json.Unmarshal(appBinding.Spec.Parameters.Raw, &parameters); err != nil {
-			klog.Errorf("unable to unmarshal appBinding.Spec.Parameters.Raw. Reason: %v", err)
-		}
-	}
-	if appBinding.Spec.ClientConfig.CABundle != nil {
-		if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey), appBinding.Spec.ClientConfig.CABundle, 0600); err != nil {
-			return nil, err
-		}
-		caPath := filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey)
-		args = append(args, "--tls")
-		args = append(args, "--cacert", caPath)
-	}
-
-	if parameters.ClientCertSecret != nil {
-		clientSecret, err := opt.kubeClient.CoreV1().Secrets(opt.namespace).Get(context.TODO(), parameters.ClientCertSecret.Name, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-
-		certByte, ok := clientSecret.Data[core.TLSCertKey]
-		if !ok {
-			return nil, fmt.Errorf("can't find client cert")
-		}
-		if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey), certByte, 0600); err != nil {
-			return nil, err
-		}
-		certPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey)
-
-		keyByte, ok := clientSecret.Data[core.TLSPrivateKeyKey]
-		if !ok {
-			return nil, fmt.Errorf("can't find client private key")
-		}
-
-		if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey), keyByte, 0600); err != nil {
-			return nil, err
-		}
-		keyPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey)
-
-		args = append(args, "--cert", certPath, "--key", keyPath)
-	}
-
-	return args, nil
 }
