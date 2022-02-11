@@ -87,21 +87,23 @@ func (opt *redisOptions) newSessionWrapper(cmd string) *sessionWrapper {
 }
 
 func (session *sessionWrapper) setDatabaseCredentials(kubeClient kubernetes.Interface, appBinding *appcatalog.AppBinding) error {
-	appBindingSecret, err := kubeClient.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), appBinding.Spec.Secret.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
+	if appBinding.Spec.Secret != nil {
+		appBindingSecret, err := kubeClient.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), appBinding.Spec.Secret.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		err = appBinding.TransformSecret(kubeClient, appBindingSecret.Data)
+		if err != nil {
+			return err
+		}
+
+		// set auth env for redis-cli
+		session.sh.SetEnv(EnvRedisCLIAuth, string(appBindingSecret.Data[RedisPassword]))
+
+		// set auth env for redis-dump-go
+		session.sh.SetEnv(EnvRedisDumpGoAuth, string(appBindingSecret.Data[RedisPassword]))
 	}
-
-	err = appBinding.TransformSecret(kubeClient, appBindingSecret.Data)
-	if err != nil {
-		return err
-	}
-
-	// set auth env for redis-cli
-	session.sh.SetEnv(EnvRedisCLIAuth, string(appBindingSecret.Data[RedisPassword]))
-
-	// set auth env for redis-dump-go
-	session.sh.SetEnv(EnvRedisDumpGoAuth, string(appBindingSecret.Data[RedisPassword]))
 
 	return nil
 }
