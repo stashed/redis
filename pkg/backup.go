@@ -109,7 +109,6 @@ func NewCmdBackup() *cobra.Command {
 			}
 
 			return nil
-
 		},
 	}
 
