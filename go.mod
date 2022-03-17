@@ -3,6 +3,7 @@ module stash.appscode.dev/redis
 go 1.15
 
 require (
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/spf13/cobra v1.2.1
 	go.bytebuilders.dev/license-verifier/kubernetes v0.9.7
 	gomodules.xyz/flags v0.1.3
