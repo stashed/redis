@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	kmapi "kmodules.xyz/client-go/api/v1"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
@@ -68,6 +69,7 @@ type redisOptions struct {
 	setupOptions  restic.SetupOptions
 	backupOptions restic.BackupOptions
 	dumpOptions   restic.DumpOptions
+	config        *restclient.Config
 }
 
 type sessionWrapper struct {
