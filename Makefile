@@ -43,7 +43,7 @@ else
 endif
 
 RESTIC_VER       := 0.13.1
-REDIS_DUMP_VER   := 0.7.2
+REDIS_DUMP_VER   := 0.7.2-ac
 
 ###
 ### These variables should not need tweaking.
