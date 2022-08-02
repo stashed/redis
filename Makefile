@@ -43,7 +43,7 @@ else
 endif
 
 RESTIC_VER       := 0.13.1
-REDIS_DUMP_VER   := 0.6.0
+REDIS_DUMP_VER   := 0.7.2-ac
 
 ###
 ### These variables should not need tweaking.
@@ -59,8 +59,8 @@ BIN_PLATFORMS    := $(DOCKER_PLATFORMS)
 OS   := $(if $(GOOS),$(GOOS),$(shell go env GOOS))
 ARCH := $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
 
-BASEIMAGE_PROD   ?= redis:6.2.5
-BASEIMAGE_DBG    ?= redis:6.2.5
+BASEIMAGE_PROD   ?= redis:7.0.4
+BASEIMAGE_DBG    ?= redis:7.0.4
 
 IMAGE            := $(REGISTRY)/$(BIN)
 VERSION_PROD     := $(VERSION)
