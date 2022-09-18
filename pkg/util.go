@@ -106,7 +106,7 @@ func (session *sessionWrapper) setDatabaseCredentials(kubeClient kubernetes.Inte
 	return nil
 }
 
-func (opt redisOptions) setTLSParameters(appBinding *appcatalog.AppBinding, cmd *restic.Command) error {
+func (opt *redisOptions) setTLSParameters(appBinding *appcatalog.AppBinding, cmd *restic.Command) error {
 	// if ssl enabled, add ca.crt in the arguments
 	if appBinding.Spec.ClientConfig.CABundle != nil {
 		parameters := v1alpha1.RedisConfiguration{}
@@ -160,7 +160,7 @@ func (session *sessionWrapper) setUserArgs(args string) {
 	}
 }
 
-func (session sessionWrapper) waitForDBReady(appBinding *appcatalog.AppBinding) error {
+func (session *sessionWrapper) waitForDBReady(appBinding *appcatalog.AppBinding) error {
 	klog.Infoln("Waiting for the database to be ready.....")
 	sh := shell.NewSession()
 	for k, v := range session.sh.Env {
