@@ -20,7 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -116,7 +116,7 @@ func (opt redisOptions) setTLSParameters(appBinding *appcatalog.AppBinding, cmd 
 			}
 		}
 
-		if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey), appBinding.Spec.ClientConfig.CABundle, 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey), appBinding.Spec.ClientConfig.CABundle, 0o600); err != nil {
 			return err
 		}
 		caPath := filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey)
@@ -133,7 +133,7 @@ func (opt redisOptions) setTLSParameters(appBinding *appcatalog.AppBinding, cmd 
 			if !ok {
 				return fmt.Errorf("can't find client cert")
 			}
-			if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey), certByte, 0o600); err != nil {
+			if err := os.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey), certByte, 0o600); err != nil {
 				return err
 			}
 			certPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey)
@@ -143,7 +143,7 @@ func (opt redisOptions) setTLSParameters(appBinding *appcatalog.AppBinding, cmd 
 				return fmt.Errorf("can't find client private key")
 			}
 
-			if err := ioutil.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey), keyByte, 0o600); err != nil {
+			if err := os.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey), keyByte, 0o600); err != nil {
 				return err
 			}
 			keyPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey)
