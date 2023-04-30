@@ -18,13 +18,18 @@ package pkg
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	api_v1beta1 "stash.appscode.dev/apimachinery/apis/stash/v1beta1"
 	"stash.appscode.dev/apimachinery/pkg/restic"
 
+	"github.com/mediocregopher/radix/v3"
 	"github.com/spf13/cobra"
+	"github.com/yannh/redis-dump-go/pkg/config"
+	"github.com/yannh/redis-dump-go/pkg/redisdump"
 	license "go.bytebuilders.dev/license-verifier/kubernetes"
 	"gomodules.xyz/flags"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -134,6 +139,8 @@ func NewCmdRestore() *cobra.Command {
 
 	cmd.Flags().StringVar(&opt.outputDir, "output-dir", opt.outputDir, "Directory where output.json file will be written (keep empty if you don't need to write output in file)")
 
+	cmd.Flags().IntVar(&opt.NWorkers, "n", 10, "Parallel workers")
+
 	return cmd
 }
 
@@ -164,48 +171,157 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
-	session := opt.newSessionWrapper(RedisRestoreCMD)
-
-	err = session.setDatabaseCredentials(opt.kubeClient, appBinding)
-	if err != nil {
-		return nil, err
-	}
-
-	err = opt.setTLSParameters(appBinding, session.cmd)
-	if err != nil {
-		return nil, err
-	}
-
-	err = session.waitForDBReady(appBinding)
-	if err != nil {
-		return nil, err
-	}
-
-	session.cmd.Args = append(session.cmd.Args, "--pipe")
-
 	hostname, err := appBinding.Hostname()
 	if err != nil {
 		return nil, err
 	}
-	session.cmd.Args = append(session.cmd.Args, "-h", hostname)
-
 	port, err := appBinding.Port()
 	if err != nil {
 		return nil, err
 	}
-	// if port is specified, append port in the arguments
-	if port != 0 {
-		session.cmd.Args = append(session.cmd.Args, "-p", strconv.Itoa(int(port)))
-	}
-
-	session.setUserArgs(opt.redisArgs)
-
-	// append the restore command to the pipeline
-	opt.dumpOptions.StdoutPipeCommands = append(opt.dumpOptions.StdoutPipeCommands, *session.cmd)
-	resticWrapper, err := restic.NewResticWrapperFromShell(opt.setupOptions, session.sh)
+	username, password, err := getDatabaseCredentials(opt.kubeClient, appBinding)
 	if err != nil {
 		return nil, err
 	}
-	// Run dump
-	return resticWrapper.Dump(opt.dumpOptions, targetRef)
+
+	s := redisdump.Host{
+		Host:       hostname,
+		Port:       int(port),
+		Username:   username,
+		Password:   password,
+		TlsHandler: nil, // TODO(Shaad7): Add support for tls protected redis
+	}
+
+	if hosts, err := redisdump.GetHosts(s, opt.NWorkers); err != nil {
+		return nil, err
+	} else {
+		redisCluster := len(hosts) > 1
+		// Start clock to measure total restore duration
+		startTime := time.Now()
+		beforeKeys := 0
+		afterKeys := 0
+
+		for _, host := range hosts {
+			session := opt.newSessionWrapper(RedisRestoreCMD)
+
+			session.setDatabaseCredentials(host.Password)
+			if err != nil {
+				return nil, err
+			}
+
+			err = opt.setTLSParameters(appBinding, session.cmd)
+			if err != nil {
+				return nil, err
+			}
+
+			err = session.waitForDBReady(host)
+			if err != nil {
+				return nil, err
+			}
+
+			session.cmd.Args = append(session.cmd.Args, "--pipe")
+
+			session.cmd.Args = append(session.cmd.Args, "-h", host.Host)
+
+			// if port is specified, append port in the arguments
+			if host.Port != 0 {
+				session.cmd.Args = append(session.cmd.Args, "-p", strconv.Itoa(host.Port))
+			}
+
+			session.setUserArgs(opt.redisArgs)
+
+			// append the restore command to the pipeline
+			opt.dumpOptions.StdoutPipeCommands = []restic.Command{*session.cmd}
+			resticWrapper, err := restic.NewResticWrapperFromShell(opt.setupOptions, session.sh)
+			if err != nil {
+				return nil, err
+			}
+
+			// if source host is not specified then use current host as source host
+			if opt.dumpOptions.SourceHost == "" {
+				opt.dumpOptions.SourceHost = opt.dumpOptions.Host
+			}
+
+			var client *radix.Pool
+			if redisCluster {
+				client, err = redisdump.NewClient(host, nil, opt.NWorkers)
+				if err != nil {
+					return nil, err
+				}
+				if size, err := DBSize(client); err != nil {
+					return nil, err
+				} else {
+					beforeKeys += size
+				}
+			}
+
+			// Run dump
+			// Redis cluster restore will always return error. So, ignore error for redis clusters
+			_, err = resticWrapper.DumpOnce(opt.dumpOptions)
+			if !redisCluster && err != nil {
+				return nil, err
+			}
+
+			if redisCluster {
+				if size, err := DBSize(client); err != nil {
+					return nil, err
+				} else {
+					afterKeys += size
+				}
+				client.Close()
+			}
+		}
+
+		if redisCluster {
+			client, err := redisdump.NewCluster(hosts)
+			if err != nil {
+				return nil, err
+			}
+			defer client.Close()
+
+			var strBackedupKeys string
+			err = client.Do(radix.Cmd(&strBackedupKeys, "GET", config.KeyTotalKeys))
+			if err != nil {
+				return nil, err
+			}
+			backedupKeys, err := strconv.Atoi(strBackedupKeys)
+			if err != nil {
+				return nil, err
+			}
+			fmt.Printf("Total keys found in backuped data: %d\n", backedupKeys)
+			fmt.Printf("Total keys in redis before restore: %d, after restore: %d\n", beforeKeys, afterKeys)
+
+			_ = client.Do(radix.Cmd(nil, "DEL", config.KeyTotalKeys))
+		} else {
+			client, err := redisdump.NewClient(s, nil, opt.NWorkers)
+			if err != nil {
+				return nil, err
+			}
+			defer client.Close()
+
+			_ = client.Do(radix.Cmd(nil, "DEL", config.KeyTotalKeys))
+		}
+
+		restoreStats := api_v1beta1.HostRestoreStats{
+			Hostname: opt.dumpOptions.Host,
+		}
+		// Dump successful. Now, calculate total session duration.
+		restoreStats.Duration = time.Since(startTime).String()
+		restoreStats.Phase = api_v1beta1.HostRestoreSucceeded
+		restoreOutput := &restic.RestoreOutput{
+			RestoreTargetStatus: api_v1beta1.RestoreMemberStatus{
+				Ref:   targetRef,
+				Stats: []api_v1beta1.HostRestoreStats{restoreStats},
+			},
+		}
+		return restoreOutput, nil
+	}
+}
+
+func DBSize(client *radix.Pool) (int, error) {
+	var dbSize string
+	if err := client.Do(radix.Cmd(&dbSize, "dbsize")); err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(dbSize)
 }
