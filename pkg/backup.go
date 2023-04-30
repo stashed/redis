@@ -27,6 +27,7 @@ import (
 	api_util "stash.appscode.dev/apimachinery/pkg/util"
 
 	"github.com/spf13/cobra"
+	"github.com/yannh/redis-dump-go/pkg/redisdump"
 	license "go.bytebuilders.dev/license-verifier/kubernetes"
 	"gomodules.xyz/flags"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -192,39 +193,46 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 		return nil, err
 	}
 
-	session := opt.newSessionWrapper(RedisDumpCMD)
-
-	err = session.setDatabaseCredentials(opt.kubeClient, appBinding)
+	hostname, err := appBinding.Hostname()
 	if err != nil {
 		return nil, err
 	}
+	port, err := appBinding.Port()
+	if err != nil {
+		return nil, err
+	}
+	username, password, err := getDatabaseCredentials(opt.kubeClient, appBinding)
+	if err != nil {
+		return nil, err
+	}
+
+	s := redisdump.Host{
+		Host:       hostname,
+		Port:       int(port),
+		Username:   username,
+		Password:   password,
+		TlsHandler: nil, // TODO(Shaad7): Add support for tls protected redis
+	}
+
+	session := opt.newSessionWrapper(RedisDumpCMD)
+	session.setDatabaseCredentials(password)
 
 	err = opt.setTLSParameters(appBinding, session.cmd)
 	if err != nil {
 		return nil, err
 	}
 
-	err = session.waitForDBReady(appBinding)
+	err = session.waitForDBReady(s)
 	if err != nil {
 		return nil, err
 	}
 
-	hostname, err := appBinding.Hostname()
-	if err != nil {
-		return nil, err
-	}
-
-	session.cmd.Args = append(session.cmd.Args, "-host", hostname)
-
-	port, err := appBinding.Port()
-	if err != nil {
-		return nil, err
-	}
-
+	session.cmd.Args = append(session.cmd.Args, "-host", s.Host)
 	// if port is specified, append port in the arguments
-	if port != 0 {
-		session.cmd.Args = append(session.cmd.Args, "-port", strconv.Itoa(int(port)))
+	if s.Port != 0 {
+		session.cmd.Args = append(session.cmd.Args, "-port", strconv.Itoa(s.Port))
 	}
+	session.cmd.Args = append(session.cmd.Args, "--set-total-keys")
 
 	session.setUserArgs(opt.redisArgs)
 	// add backup command in the pipeline
