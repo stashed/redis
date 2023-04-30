@@ -3,7 +3,9 @@ module stash.appscode.dev/redis
 go 1.18
 
 require (
+	github.com/mediocregopher/radix/v3 v3.8.0
 	github.com/spf13/cobra v1.6.0
+	github.com/yannh/redis-dump-go v0.0.0-00010101000000-000000000000
 	go.bytebuilders.dev/license-verifier/kubernetes v0.12.0
 	gomodules.xyz/flags v0.1.3
 	gomodules.xyz/go-sh v0.1.0
@@ -17,7 +19,7 @@ require (
 	kmodules.xyz/custom-resources v0.25.0
 	kmodules.xyz/offshoot-api v0.25.0
 	kubedb.dev/apimachinery v0.28.4-0.20220918021210-a0b96812228b
-	stash.appscode.dev/apimachinery v0.28.0
+	stash.appscode.dev/apimachinery v0.28.1-0.20230429131740-425734e18c7c
 )
 
 require (
@@ -69,6 +71,7 @@ require (
 	golang.org/x/term v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.1.0 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gomodules.xyz/clock v0.0.0-20200817085942-06523dba733f // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	gomodules.xyz/mergo v0.3.13 // indirect
@@ -93,3 +96,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
+
+replace github.com/yannh/redis-dump-go => github.com/kubedb/redis-dump-go v0.8.1-0.20230429151509-2f2a7ce60763
