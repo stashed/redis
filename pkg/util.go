@@ -29,6 +29,7 @@ import (
 	stash "stash.appscode.dev/apimachinery/client/clientset/versioned"
 	"stash.appscode.dev/apimachinery/pkg/restic"
 
+	"github.com/yannh/redis-dump-go/pkg/redisdump"
 	shell "gomodules.xyz/go-sh"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,8 +44,6 @@ import (
 )
 
 const (
-	RedisUser          = "username"
-	RedisPassword      = "password"
 	RedisDumpFile      = "dumpfile.resp"
 	RedisDumpCMD       = "redis-dump-go"
 	RedisRestoreCMD    = "redis-cli"
@@ -70,6 +69,8 @@ type redisOptions struct {
 	backupOptions restic.BackupOptions
 	dumpOptions   restic.DumpOptions
 	config        *restclient.Config
+
+	NWorkers int
 }
 
 type sessionWrapper struct {
@@ -86,26 +87,32 @@ func (opt *redisOptions) newSessionWrapper(cmd string) *sessionWrapper {
 	}
 }
 
-func (session *sessionWrapper) setDatabaseCredentials(kubeClient kubernetes.Interface, appBinding *appcatalog.AppBinding) error {
-	if appBinding.Spec.Secret != nil {
-		appBindingSecret, err := kubeClient.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), appBinding.Spec.Secret.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-
-		err = appBinding.TransformSecret(kubeClient, appBindingSecret.Data)
-		if err != nil {
-			return err
-		}
-
-		// set auth env for redis-cli
-		session.sh.SetEnv(EnvRedisCLIAuth, string(appBindingSecret.Data[RedisPassword]))
-
-		// set auth env for redis-dump-go
-		session.sh.SetEnv(EnvRedisDumpGoAuth, string(appBindingSecret.Data[RedisPassword]))
+func getDatabaseCredentials(kc kubernetes.Interface, appBinding *appcatalog.AppBinding) (string, string, error) {
+	if appBinding.Spec.Secret == nil {
+		return "", "", nil
+	}
+	appBindingSecret, err := kc.CoreV1().Secrets(appBinding.Namespace).Get(context.TODO(), appBinding.Spec.Secret.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", "", err
 	}
 
-	return nil
+	err = appBinding.TransformSecret(kc, appBindingSecret.Data)
+	if err != nil {
+		return "", "", err
+	}
+	return string(appBindingSecret.Data[core.BasicAuthUsernameKey]), string(appBindingSecret.Data[core.BasicAuthPasswordKey]), nil
+}
+
+func (session *sessionWrapper) setDatabaseCredentials(password string) {
+	if password == "" {
+		return
+	}
+
+	// set auth env for redis-cli
+	session.sh.SetEnv(EnvRedisCLIAuth, password)
+
+	// set auth env for redis-dump-go
+	session.sh.SetEnv(EnvRedisDumpGoAuth, password)
 }
 
 func (opt *redisOptions) setTLSParameters(appBinding *appcatalog.AppBinding, cmd *restic.Command) error {
@@ -162,7 +169,7 @@ func (session *sessionWrapper) setUserArgs(args string) {
 	}
 }
 
-func (session *sessionWrapper) waitForDBReady(appBinding *appcatalog.AppBinding) error {
+func (session *sessionWrapper) waitForDBReady(host redisdump.Host) error {
 	klog.Infoln("Waiting for the database to be ready.....")
 	sh := shell.NewSession()
 	for k, v := range session.sh.Env {
@@ -170,21 +177,11 @@ func (session *sessionWrapper) waitForDBReady(appBinding *appcatalog.AppBinding)
 	}
 	sh.ShowCMD = true
 
-	hostname, err := appBinding.Hostname()
-	if err != nil {
-		return err
-	}
-
-	args := append(session.cmd.Args, "-h", hostname)
-
-	port, err := appBinding.Port()
-	if err != nil {
-		return err
-	}
+	args := append(session.cmd.Args, "-h", host.Host)
 
 	// if port is specified, append port in the arguments
-	if port != 0 {
-		args = append(args, "-p", strconv.Itoa(int(port)))
+	if host.Port != 0 {
+		args = append(args, "-p", strconv.Itoa(host.Port))
 	}
 
 	args = append(args, "ping")
