@@ -115,7 +115,7 @@ func (session *sessionWrapper) setDatabaseCredentials(password string) {
 	session.sh.SetEnv(EnvRedisDumpGoAuth, password)
 }
 
-func (opt *redisOptions) setTLSParameters(appBinding *appcatalog.AppBinding, cmd *restic.Command) error {
+func (opt *redisOptions) writeTLSCertsToFile(appBinding *appcatalog.AppBinding) error {
 	// if ssl enabled, add ca.crt in the arguments
 	if appBinding.Spec.ClientConfig.CABundle != nil {
 		parameters := v1alpha1.RedisConfiguration{}
@@ -128,9 +128,6 @@ func (opt *redisOptions) setTLSParameters(appBinding *appcatalog.AppBinding, cmd
 		if err := os.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey), appBinding.Spec.ClientConfig.CABundle, 0o600); err != nil {
 			return err
 		}
-		caPath := filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey)
-		cmd.Args = append(cmd.Args, "--tls")
-		cmd.Args = append(cmd.Args, "--cacert", caPath)
 
 		if parameters.ClientCertSecret != nil {
 			clientSecret, err := opt.kubeClient.CoreV1().Secrets(opt.namespace).Get(context.TODO(), parameters.ClientCertSecret.Name, metav1.GetOptions{})
@@ -145,7 +142,6 @@ func (opt *redisOptions) setTLSParameters(appBinding *appcatalog.AppBinding, cmd
 			if err := os.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey), certByte, 0o600); err != nil {
 				return err
 			}
-			certPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey)
 
 			keyByte, ok := clientSecret.Data[core.TLSPrivateKeyKey]
 			if !ok {
@@ -155,12 +151,58 @@ func (opt *redisOptions) setTLSParameters(appBinding *appcatalog.AppBinding, cmd
 			if err := os.WriteFile(filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey), keyByte, 0o600); err != nil {
 				return err
 			}
+
+		}
+	}
+	return nil
+}
+
+func (opt *redisOptions) setTLSParametersToCMD(appBinding *appcatalog.AppBinding, cmd *restic.Command) {
+	// if ssl enabled, add ca.crt in the arguments
+	if appBinding.Spec.ClientConfig.CABundle != nil {
+		parameters := v1alpha1.RedisConfiguration{}
+		if appBinding.Spec.Parameters != nil {
+			if err := json.Unmarshal(appBinding.Spec.Parameters.Raw, &parameters); err != nil {
+				klog.Errorf("unable to unmarshal appBinding.Spec.Parameters.Raw. Reason: %v", err)
+			}
+		}
+
+		caPath := filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey)
+		cmd.Args = append(cmd.Args, "--tls")
+		cmd.Args = append(cmd.Args, "--cacert", caPath)
+
+		if parameters.ClientCertSecret != nil {
+			certPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey)
+
 			keyPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey)
 
 			cmd.Args = append(cmd.Args, "--cert", certPath, "--key", keyPath)
 		}
 	}
-	return nil
+}
+
+func (opt *redisOptions) getTLSParameter(appBinding *appcatalog.AppBinding) (string, string, string) {
+	// if ssl enabled, add ca.crt in the arguments
+	if appBinding.Spec.ClientConfig.CABundle != nil {
+		parameters := v1alpha1.RedisConfiguration{}
+		if appBinding.Spec.Parameters != nil {
+			if err := json.Unmarshal(appBinding.Spec.Parameters.Raw, &parameters); err != nil {
+				klog.Errorf("unable to unmarshal appBinding.Spec.Parameters.Raw. Reason: %v", err)
+			}
+		}
+
+		caPath := filepath.Join(opt.setupOptions.ScratchDir, core.ServiceAccountRootCAKey)
+
+		if parameters.ClientCertSecret != nil {
+			certPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSCertKey)
+
+			keyPath := filepath.Join(opt.setupOptions.ScratchDir, core.TLSPrivateKeyKey)
+
+			return caPath, certPath, keyPath
+		}
+		return caPath, "", ""
+	}
+	return "", "", ""
 }
 
 func (session *sessionWrapper) setUserArgs(args string) {

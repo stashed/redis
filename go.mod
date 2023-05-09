@@ -3,7 +3,7 @@ module stash.appscode.dev/redis
 go 1.18
 
 require (
-	github.com/mediocregopher/radix/v3 v3.8.0
+	github.com/mediocregopher/radix/v3 v3.8.1
 	github.com/spf13/cobra v1.6.0
 	github.com/yannh/redis-dump-go v0.0.0-00010101000000-000000000000
 	go.bytebuilders.dev/license-verifier/kubernetes v0.12.0
@@ -97,4 +97,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace github.com/yannh/redis-dump-go => github.com/kubedb/redis-dump-go v0.8.1-0.20230429151509-2f2a7ce60763
+replace github.com/yannh/redis-dump-go => github.com/kubedb/redis-dump-go v0.8.1-0.20230510105148-195f8ab610e1

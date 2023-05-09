@@ -9,17 +9,17 @@ import (
 )
 
 type TlsHandler struct {
-	skipVerify bool
-	caCertPath string
-	certPath   string
-	keyPath    string
+	SkipVerify bool
+	CACertPath string
+	CertPath   string
+	KeyPath    string
 }
 
 func NewTlsHandler(caCertPath, certPath, keyPath string, insecure bool) (*TlsHandler, error) {
 	if caCertPath == "" && certPath == "" && keyPath == "" {
 		if insecure {
 			return &TlsHandler{
-				skipVerify: true,
+				SkipVerify: true,
 			}, nil
 		} else {
 			return nil, errors.New("no cert is set. if skip cert validation to set -insecure option")
@@ -27,10 +27,10 @@ func NewTlsHandler(caCertPath, certPath, keyPath string, insecure bool) (*TlsHan
 	}
 
 	return &TlsHandler{
-		skipVerify: false,
-		caCertPath: caCertPath,
-		certPath:   certPath,
-		keyPath:    keyPath,
+		SkipVerify: false,
+		CACertPath: caCertPath,
+		CertPath:   certPath,
+		KeyPath:    keyPath,
 	}, nil
 }
 
@@ -39,7 +39,7 @@ func tlsConfig(tlsHandler *TlsHandler) (*tls.Config, error) {
 		return nil, nil
 	}
 
-	if tlsHandler.skipVerify {
+	if tlsHandler.SkipVerify {
 		return &tls.Config{
 			InsecureSkipVerify: true,
 		}, nil
@@ -47,8 +47,8 @@ func tlsConfig(tlsHandler *TlsHandler) (*tls.Config, error) {
 
 	certPool := x509.NewCertPool()
 	// ca cert is optional
-	if tlsHandler.caCertPath != "" {
-		pem, err := ioutil.ReadFile(tlsHandler.caCertPath)
+	if tlsHandler.CACertPath != "" {
+		pem, err := ioutil.ReadFile(tlsHandler.CACertPath)
 		if err != nil {
 			return nil, fmt.Errorf("connectionpool: unable to open CA certs: %v", err)
 		}
@@ -63,8 +63,8 @@ func tlsConfig(tlsHandler *TlsHandler) (*tls.Config, error) {
 		RootCAs:      certPool,
 	}
 
-	if tlsHandler.certPath != "" && tlsHandler.keyPath != "" {
-		cert, err := tls.LoadX509KeyPair(tlsHandler.certPath, tlsHandler.keyPath)
+	if tlsHandler.CertPath != "" && tlsHandler.KeyPath != "" {
+		cert, err := tls.LoadX509KeyPair(tlsHandler.CertPath, tlsHandler.KeyPath)
 		if err != nil {
 			return nil, err
 		}
