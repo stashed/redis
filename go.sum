@@ -293,8 +293,8 @@ github.com/kr/pretty v0.2.0/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfn
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
-github.com/kubedb/redis-dump-go v0.8.1-0.20230510105148-195f8ab610e1 h1:1Yh9vpAg4SLbqCoJ+Gqmb0XqkeHa5DRURgZlHvEJKLs=
-github.com/kubedb/redis-dump-go v0.8.1-0.20230510105148-195f8ab610e1/go.mod h1:nEQHeV2eDU9UjWkd+PXjU5skPdS9CAGXaQs39VGi1NA=
+github.com/kubedb/redis-dump-go v0.8.1-ac h1:Cv126EMUQxBOKvVJCO/d4SRuBQBIuQzFvgPayG0mSlI=
+github.com/kubedb/redis-dump-go v0.8.1-ac/go.mod h1:nEQHeV2eDU9UjWkd+PXjU5skPdS9CAGXaQs39VGi1NA=
 github.com/magiconair/properties v1.8.1/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
 github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=
 github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e/go.mod h1:C1wdFJiN94OJF2b5HbByQZoLdCWB1Yqtg26g4irojpc=

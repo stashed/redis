@@ -97,4 +97,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace github.com/yannh/redis-dump-go => github.com/kubedb/redis-dump-go v0.8.1-0.20230510105148-195f8ab610e1
+replace github.com/yannh/redis-dump-go => github.com/kubedb/redis-dump-go v0.8.1-ac
