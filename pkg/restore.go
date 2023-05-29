@@ -184,12 +184,27 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 		return nil, err
 	}
 
+	err = opt.writeTLSCertsToFile(appBinding)
+	if err != nil {
+		return nil, err
+	}
+
+	var tlsHandler *redisdump.TlsHandler = nil
+	ca, cert, key := opt.getTLSParameter(appBinding)
+	if ca != "" {
+		tlsHandler = &redisdump.TlsHandler{
+			CACertPath: ca,
+			CertPath:   cert,
+			KeyPath:    key,
+		}
+	}
+
 	s := redisdump.Host{
 		Host:       hostname,
 		Port:       int(port),
 		Username:   username,
 		Password:   password,
-		TlsHandler: nil, // TODO(Shaad7): Add support for tls protected redis
+		TlsHandler: tlsHandler,
 	}
 
 	if hosts, err := redisdump.GetHosts(s, opt.NWorkers); err != nil {
@@ -200,6 +215,13 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 		startTime := time.Now()
 		beforeKeys := 0
 		afterKeys := 0
+		if appBinding.Spec.ClientConfig.CABundle != nil {
+			for i := range hosts {
+				hosts[i].TlsHandler = &redisdump.TlsHandler{
+					SkipVerify: true,
+				}
+			}
+		}
 
 		for _, host := range hosts {
 			session := opt.newSessionWrapper(RedisRestoreCMD)
@@ -209,7 +231,7 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 				return nil, err
 			}
 
-			err = opt.setTLSParameters(appBinding, session.cmd)
+			opt.setTLSParametersToCMD(appBinding, session.cmd)
 			if err != nil {
 				return nil, err
 			}
