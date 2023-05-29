@@ -205,19 +205,23 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 	if err != nil {
 		return nil, err
 	}
+	err = opt.writeTLSCertsToFile(appBinding)
+	if err != nil {
+		return nil, err
+	}
 
 	s := redisdump.Host{
 		Host:       hostname,
 		Port:       int(port),
 		Username:   username,
 		Password:   password,
-		TlsHandler: nil, // TODO(Shaad7): Add support for tls protected redis
+		TlsHandler: nil,
 	}
 
 	session := opt.newSessionWrapper(RedisDumpCMD)
 	session.setDatabaseCredentials(password)
 
-	err = opt.setTLSParameters(appBinding, session.cmd)
+	opt.setTLSParametersToCMD(appBinding, session.cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -225,6 +229,13 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 	err = session.waitForDBReady(s)
 	if err != nil {
 		return nil, err
+	}
+
+	if appBinding.Spec.ClientConfig.CABundle != nil {
+		// clear all the args ( tls args )
+		session.cmd.Args = session.cmd.Args[:0]
+		session.cmd.Args = append(session.cmd.Args, "--tls")
+		session.cmd.Args = append(session.cmd.Args, "--insecure")
 	}
 
 	session.cmd.Args = append(session.cmd.Args, "-host", s.Host)
