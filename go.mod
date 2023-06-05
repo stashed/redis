@@ -6,7 +6,7 @@ require (
 	github.com/mediocregopher/radix/v3 v3.8.1
 	github.com/spf13/cobra v1.7.0
 	github.com/yannh/redis-dump-go v0.0.0-00010101000000-000000000000
-	go.bytebuilders.dev/license-verifier/kubernetes v0.12.0
+	go.bytebuilders.dev/license-verifier/kubernetes v0.13.2
 	gomodules.xyz/flags v0.1.3
 	gomodules.xyz/go-sh v0.1.0
 	gomodules.xyz/logs v0.0.6
@@ -21,6 +21,8 @@ require (
 	kubedb.dev/apimachinery v0.28.4-0.20220918021210-a0b96812228b
 	stash.appscode.dev/apimachinery v0.30.0
 )
+
+require github.com/cespare/xxhash/v2 v2.2.0 // indirect
 
 require (
 	cloud.google.com/go v0.99.0 // indirect
@@ -64,7 +66,7 @@ require (
 	github.com/yudai/gojsondiff v1.0.0 // indirect
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect
 	go.bytebuilders.dev/license-proxyserver v0.0.3 // indirect
-	go.bytebuilders.dev/license-verifier v0.13.0 // indirect
+	go.bytebuilders.dev/license-verifier v0.13.2 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/oauth2 v0.5.0 // indirect
