@@ -15,11 +15,11 @@ require (
 	k8s.io/apimachinery v0.25.3
 	k8s.io/client-go v0.25.1
 	k8s.io/klog/v2 v2.80.1
-	kmodules.xyz/client-go v0.25.29
+	kmodules.xyz/client-go v0.25.37
 	kmodules.xyz/custom-resources v0.25.2
 	kmodules.xyz/offshoot-api v0.25.4
 	kubedb.dev/apimachinery v0.28.4-0.20220918021210-a0b96812228b
-	stash.appscode.dev/apimachinery v0.31.0
+	stash.appscode.dev/apimachinery v0.32.0
 )
 
 require github.com/onsi/gomega v1.20.1 // indirect
@@ -67,12 +67,12 @@ require (
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect
 	go.bytebuilders.dev/license-proxyserver v0.0.3 // indirect
 	go.bytebuilders.dev/license-verifier v0.13.2 // indirect
-	golang.org/x/crypto v0.9.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
+	golang.org/x/crypto v0.13.0 // indirect
+	golang.org/x/net v0.15.0 // indirect
 	golang.org/x/oauth2 v0.5.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/term v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
+	golang.org/x/term v0.12.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.1.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gomodules.xyz/clock v0.0.0-20200817085942-06523dba733f // indirect
