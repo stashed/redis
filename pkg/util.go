@@ -228,7 +228,7 @@ func (session *sessionWrapper) waitForDBReady(host redisdump.Host) error {
 
 	args = append(args, "ping")
 
-	return wait.PollImmediate(time.Second*5, time.Minute*5, func() (bool, error) {
+	return wait.PollUntilContextTimeout(context.Background(), time.Second*5, time.Minute*5, true, func(ctx context.Context) (bool, error) {
 		err := sh.Command("redis-cli", args...).Run()
 		if err != nil {
 			return false, nil
