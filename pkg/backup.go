@@ -253,5 +253,10 @@ func (opt *redisOptions) backupRedis(targetRef api_v1beta1.TargetRef) (*restic.B
 	if err != nil {
 		return nil, err
 	}
+	err = resticWrapper.EnsureNoExclusiveLock(opt.kubeClient, opt.namespace)
+	if err != nil {
+		return nil, err
+	}
+
 	return resticWrapper.RunBackup(opt.backupOptions, targetRef)
 }
