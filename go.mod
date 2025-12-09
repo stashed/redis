@@ -1,8 +1,6 @@
 module stash.appscode.dev/redis
 
-go 1.23.0
-
-toolchain go1.24.4
+go 1.25.5
 
 replace github.com/yannh/redis-dump-go => github.com/kubedb/redis-dump-go v0.8.1-ac
 
