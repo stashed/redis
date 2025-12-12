@@ -292,10 +292,13 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 				} else {
 					afterKeys += size
 				}
-				err = client.Close()
-				if err != nil {
-					klog.Errorf("Error closing file: %v", err)
-				}
+
+				defer func() {
+					if err := client.Close(); err != nil {
+						klog.Errorf("Error closing radix client: %v", err)
+					}
+				}()
+
 			}
 		}
 
@@ -326,10 +329,11 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 			if err != nil {
 				return nil, err
 			}
-			err = client.Close()
-			if err != nil {
-				klog.Errorf("Error closing file: %v", err)
-			}
+			defer func() {
+				if err := client.Close(); err != nil {
+					klog.Errorf("Error closing radix client: %v", err)
+				}
+			}()
 			_ = client.Do(radix.Cmd(nil, "DEL", config.KeyTotalKeys))
 		}
 
