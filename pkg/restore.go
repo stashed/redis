@@ -307,10 +307,13 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 			if err != nil {
 				return nil, err
 			}
-			err = client.Close()
-			if err != nil {
-				klog.Errorf("Error closing file: %v", err)
-			}
+
+			defer func() {
+				if err := client.Close(); err != nil {
+					klog.Errorf("Error closing radix client: %v", err)
+				}
+			}()
+
 			var strBackedupKeys string
 			err = client.Do(radix.Cmd(&strBackedupKeys, "GET", config.KeyTotalKeys))
 			if err != nil {
