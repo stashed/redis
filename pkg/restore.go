@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	appcatalog "kmodules.xyz/custom-resources/apis/appcatalog/v1alpha1"
 	appcatalog_cs "kmodules.xyz/custom-resources/client/clientset/versioned"
 	v1 "kmodules.xyz/offshoot-api/api/v1"
@@ -291,7 +292,13 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 				} else {
 					afterKeys += size
 				}
-				client.Close()
+
+				func() {
+					if err := client.Close(); err != nil {
+						klog.Errorf("Error closing radix client: %v", err)
+					}
+				}()
+
 			}
 		}
 
@@ -300,7 +307,12 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 			if err != nil {
 				return nil, err
 			}
-			defer client.Close()
+
+			defer func() {
+				if err := client.Close(); err != nil {
+					klog.Errorf("Error closing radix client: %v", err)
+				}
+			}()
 
 			var strBackedupKeys string
 			err = client.Do(radix.Cmd(&strBackedupKeys, "GET", config.KeyTotalKeys))
@@ -320,8 +332,11 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 			if err != nil {
 				return nil, err
 			}
-			defer client.Close()
-
+			defer func() {
+				if err := client.Close(); err != nil {
+					klog.Errorf("Error closing radix client: %v", err)
+				}
+			}()
 			_ = client.Do(radix.Cmd(nil, "DEL", config.KeyTotalKeys))
 		}
 
