@@ -293,7 +293,7 @@ func (opt *redisOptions) restoreRedis(targetRef api_v1beta1.TargetRef) (*restic.
 					afterKeys += size
 				}
 
-				defer func() {
+				func() {
 					if err := client.Close(); err != nil {
 						klog.Errorf("Error closing radix client: %v", err)
 					}
