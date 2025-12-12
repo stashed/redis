@@ -1,8 +1,6 @@
 module stash.appscode.dev/redis
 
-go 1.23.0
-
-toolchain go1.24.4
+go 1.24.0
 
 replace github.com/yannh/redis-dump-go => github.com/kubedb/redis-dump-go v0.8.1-ac
 
@@ -10,7 +8,7 @@ require (
 	github.com/mediocregopher/radix/v3 v3.8.1
 	github.com/spf13/cobra v1.8.0
 	github.com/yannh/redis-dump-go v0.0.0-00010101000000-000000000000
-	go.bytebuilders.dev/license-verifier/kubernetes v0.14.6
+	go.bytebuilders.dev/license-verifier/kubernetes v0.14.10
 	gomodules.xyz/flags v0.1.3
 	gomodules.xyz/go-sh v0.1.0
 	gomodules.xyz/logs v0.0.7
@@ -19,11 +17,11 @@ require (
 	k8s.io/apimachinery v0.30.2
 	k8s.io/client-go v0.30.2
 	k8s.io/klog/v2 v2.130.1
-	kmodules.xyz/client-go v0.30.44
+	kmodules.xyz/client-go v0.30.48
 	kmodules.xyz/custom-resources v0.30.0
 	kmodules.xyz/offshoot-api v0.30.1
 	kubedb.dev/apimachinery v0.47.0
-	stash.appscode.dev/apimachinery v0.42.0
+	stash.appscode.dev/apimachinery v0.42.1-0.20251212070131-ba26c6b88bc6
 )
 
 require (
@@ -83,17 +81,17 @@ require (
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.bytebuilders.dev/license-proxyserver v0.0.20 // indirect
-	go.bytebuilders.dev/license-verifier v0.14.6 // indirect
+	go.bytebuilders.dev/license-verifier v0.14.10 // indirect
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
-	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/term v0.30.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gomodules.xyz/clock v0.0.0-20200817085942-06523dba733f // indirect
-	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
+	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	gomodules.xyz/mergo v0.3.13 // indirect
 	gomodules.xyz/pointer v0.1.0 // indirect
 	gomodules.xyz/sets v0.2.1 // indirect
