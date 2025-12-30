@@ -42,7 +42,7 @@ else
 	endif
 endif
 
-RESTIC_VER       := 0.17.3
+RESTIC_VER       := 0.18.1
 REDIS_DUMP_VER   := 0.8.2-ac
 
 ###
